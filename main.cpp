@@ -4,6 +4,7 @@
 #include <vector>
 #include <iostream>
 #include "Cell.h"
+#include "genericButton.h"
 
 using namespace std;
 
@@ -11,15 +12,14 @@ void setText(sf::Text &text, float x, float y);
 void readConfigFile(int& numCol, int& numRow, int& numMines);
 vector<vector<Cell>> createBoard(int& numCol, int& numRow, int& numMines);
 void printBoard(const vector<vector<Cell>>& board, int& numRow, int& numCol);
-void drawGame(sf::RenderWindow& window, const int& numCol, const int& numRow, vector<vector<Cell>>& board, bool& pauseState);
+void drawGame(sf::RenderWindow& window, const int& numCol, const int& numRow, vector<vector<Cell>>& board, vector<genericButton>& buttons);
 void drawFace(sf::RenderWindow& window, const int& numCol, const int& numRow);
 void drawMineButton(sf::RenderWindow& window, const int& numCol, const int& numRow);
-void drawPauseButton(sf::RenderWindow& window, const int& numCol, const int& numRow, const bool& state);
+void drawPauseButton(sf::RenderWindow& window, const int& numCol, const int& numRow, vector<genericButton>& buttons);
 void drawLeaderboardButton(sf::RenderWindow& window, const int& numCol, const int& numRow);
-void drawPlayZone(sf::RenderWindow& window, const int& numCol, const int& numRow, const vector<vector<Cell>>& board);
-void updateTileImage(vector<vector<Cell>>& board, sf::Vector2f click);
-string chooseRightImage(int value);
-sf::Vector2f getMouseClickPosition();
+void drawPlayZone(sf::RenderWindow& window, const int& numCol, const int& numRow, vector<vector<Cell>>& board);
+string chooseImage(int value);
+vector<genericButton> createButtonsVector();
 
 int main() {
 
@@ -30,9 +30,8 @@ int main() {
     int colCount = 0;
     int minesCount = 0;
 
-    bool pauseButtonState = false;
-
     readConfigFile(colCount, rowCount, minesCount);
+    vector<genericButton> buttons = createButtonsVector();
 
     const int width = (colCount * 32);
     const int height = (rowCount * 32) + 100;
@@ -104,7 +103,7 @@ int main() {
                 break;
             case Game:
                 window.clear(sf::Color::White);
-                drawGame(window, colCount, rowCount, board, pauseButtonState);
+                drawGame(window, colCount, rowCount, board, buttons);
                 break;
         }
         inputName.setString(name + "|");
@@ -201,10 +200,10 @@ void printBoard(const vector<vector<Cell>>& board, int& numRow, int& numCol){
     }
 }
 
-void drawGame(sf::RenderWindow& window, const int& numCol, const int& numRow, vector<vector<Cell>>& board, bool& pauseState){
+void drawGame(sf::RenderWindow& window, const int& numCol, const int& numRow, vector<vector<Cell>>& board, vector<genericButton>& buttons){
     drawFace(window, numCol, numRow);
     drawMineButton(window, numCol, numRow);
-    drawPauseButton(window, numCol, numRow, pauseState);
+    drawPauseButton(window, numCol, numRow, buttons);
     drawLeaderboardButton(window, numCol, numRow);
     drawPlayZone(window, numCol, numRow, board);
 }
@@ -222,6 +221,7 @@ void drawFace(sf::RenderWindow& window, const int& numCol, const int& numRow){
     faceSprite.setTexture(faceTexture);
     faceSprite.setTextureRect(sf::IntRect(0, 0, 64, 64));
     faceSprite.setPosition(x, y);
+
     window.draw(faceRectangle);
     window.draw(faceSprite);
 }
@@ -243,26 +243,39 @@ void drawMineButton(sf::RenderWindow& window, const int& numCol, const int& numR
     window.draw(mineSprite);
 }
 
-void drawPauseButton(sf::RenderWindow& window, const int& numCol, const int& numRow, const bool& state){
+void drawPauseButton(sf::RenderWindow& window, const int& numCol, const int& numRow, vector<genericButton>& buttons){
     float x = ((float(numCol)) * 32) - 240;
     float y = 32 * (float(numRow) + 0.5f);
-    sf::Texture pauseTexture;
-    if(!state){
-        pauseTexture.loadFromFile("Images/pause.png");
-    }
-    else{
-        pauseTexture.loadFromFile("Images/play.png");
-    }
 
-    sf::RectangleShape pauseRectangle(sf::Vector2f(64,64));
-    pauseRectangle.setPosition(x, y);
+    for(int i = 0 ; i < buttons.size() ; i++){
+        if(buttons[i].type == "pause"){
+            sf::Texture pauseTexture;
+            pauseTexture.loadFromFile(buttons[i].imagePath);
 
-    sf::Sprite pauseSprite;
-    pauseSprite.setTexture(pauseTexture);
-    pauseSprite.setTextureRect(sf::IntRect(0, 0, 64, 64));
-    pauseSprite.setPosition(x, y);
-    window.draw(pauseRectangle);
-    window.draw(pauseSprite);
+            sf::RectangleShape pauseRectangle(sf::Vector2f(64,64));
+            pauseRectangle.setPosition(x, y);
+
+            sf::Sprite pauseSprite;
+            pauseSprite.setTexture(pauseTexture);
+            pauseSprite.setTextureRect(sf::IntRect(0, 0, 64, 64));
+            pauseSprite.setPosition(x, y);
+
+            if(sf::Mouse::isButtonPressed(sf::Mouse::Left)){
+                sf::Vector2i clickPosition = sf::Mouse::getPosition(window);
+                if(pauseRectangle.getGlobalBounds().contains(sf::Vector2f(clickPosition))){
+                    if(buttons[i].imagePath == "Images/play.png"){
+                        buttons[i].imagePath = "Images/pause.png";
+                    }
+                    else if(buttons[i].imagePath == "Images/pause.png"){
+                        buttons[i].imagePath = "Images/play.png";
+                    }
+                }
+            }
+
+            window.draw(pauseRectangle);
+            window.draw(pauseSprite);
+        }
+    }
 }
 
 void drawLeaderboardButton(sf::RenderWindow& window, const int& numCol, const int& numRow){
@@ -282,12 +295,12 @@ void drawLeaderboardButton(sf::RenderWindow& window, const int& numCol, const in
     window.draw(leaderboardSprite);
 }
 
-void drawPlayZone(sf::RenderWindow& window, const int& numCol, const int& numRow, const vector<vector<Cell>>& board){
+void drawPlayZone(sf::RenderWindow& window, const int& numCol, const int& numRow, vector<vector<Cell>>& board){
 
     for (int i = 0 ; i < numRow ; i++){
         for (int j = 0 ; j < numCol ; j++){
             sf::Texture tileTexture;
-            tileTexture.loadFromFile("Images/tile_hidden.png");
+            tileTexture.loadFromFile(board[i][j].imagePath);
 
             sf::RectangleShape tileRectangle(sf::Vector2f(32,32));
             tileRectangle.setPosition(board[i][j].position.x * 32, board[i][j].position.y * 32);
@@ -296,46 +309,54 @@ void drawPlayZone(sf::RenderWindow& window, const int& numCol, const int& numRow
             tileSprite.setTexture(tileTexture);
             tileSprite.setTextureRect(sf::IntRect(0, 0, 32, 32));
             tileSprite.setPosition(board[i][j].position.x * 32, board[i][j].position.y * 32);
+
+            if(sf::Mouse::isButtonPressed(sf::Mouse::Left)){
+                sf::Vector2i clickPosition = sf::Mouse::getPosition(window);
+                if(tileRectangle.getGlobalBounds().contains(sf::Vector2f(clickPosition))){
+                    board[i][j].imagePath = chooseImage(board[i][j].value);
+                }
+            }
+
             window.draw(tileRectangle);
             window.draw(tileSprite);
         }
     }
 }
 
-void updateTileImage(vector<vector<Cell>>& board, sf::Vector2f click){
-    for(auto & i : board){
-        for(auto & j : i){
-            if(j.position == sf::Vector2f(float(click.x),float(click.y))){
-                j.imagePath = chooseRightImage(j.value);
-            }
-        }
-    }
-}
-
-string chooseRightImage(int value){
+string chooseImage(int value){
     string path;
     if(value == 0) path = "Images/tile_revealed.png";
-    else if(value == 1) path = "Images/number_1.png";
-    else if(value == 2) path = "Images/number_2.png";
-    else if(value == 3) path = "Images/number_3.png";
-    else if(value == 4) path = "Images/number_4.png";
-    else if(value == 5) path = "Images/number_5.png";
-    else if(value == 6) path = "Images/number_6.png";
-    else if(value == 7) path = "Images/number_7.png";
-    else if(value == 8) path = "Images/number_8.png";
-    else path = "Images/mine.png";
+    else if(value == 1) path = "Images/number_1_revealed.png";
+    else if(value == 2) path = "Images/number_2_revealed.png";
+    else if(value == 3) path = "Images/number_3_revealed.png";
+    else if(value == 4) path = "Images/number_4_revealed.png";
+    else if(value == 5) path = "Images/number_5_revealed.png";
+    else if(value == 6) path = "Images/number_6_revealed.png";
+    else if(value == 7) path = "Images/number_7_revealed.png";
+    else if(value == 8) path = "Images/number_8_revealed.png";
+    else path = "Images/mine_revealed.png";
 
     return path;
 }
 
-sf::Vector2f getMouseClickPosition(){
-    sf::Vector2f click;
-    if (sf::Mouse::isButtonPressed(sf::Mouse::Left)){
-        sf::Vector2i clickPosition = sf::Mouse::getPosition();
-        int x = (clickPosition.x/32) - 18;
-        int y = (clickPosition.y/32) - 8;
-        click.x = float(x);
-        click.y = float(y);
-    }
-    return click;
+vector<genericButton> createButtonsVector(){
+
+    vector<genericButton> buttons;
+
+    genericButton pauseButton;
+    pauseButton.imagePath =  "Images/pause.png";
+    pauseButton.type = "pause";
+    buttons.push_back(pauseButton);
+
+    genericButton faceButton;
+    faceButton.imagePath =  "Images/face_happy.png";
+    faceButton.type = "face";
+    buttons.push_back(faceButton);
+
+    genericButton debugButton;
+    debugButton.imagePath = "Images/debug.png";
+    debugButton.type = "debug";
+    buttons.push_back(debugButton);
+
+    return buttons;
 }

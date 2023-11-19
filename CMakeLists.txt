@@ -5,7 +5,9 @@ set(CMAKE_CXX_STANDARD 14)
 
 add_executable(minesweeper main.cpp
         Cell.cpp
-        Cell.h)
+        Cell.h
+        genericButton.cpp
+        genericButton.h)
 
 set(SFML_STATIC_LIBRARIES TRUE)
 set(SFML_DIR C:/SFML/lib/cmake/SFML)

@@ -6,7 +6,7 @@
 #define MINESWEEPER_CELL_H
 
 
-#import <string>
+#include <string>
 #include <SFML/Graphics.hpp>
 using namespace std;
 
