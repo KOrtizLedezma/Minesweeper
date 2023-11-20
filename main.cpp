@@ -14,12 +14,16 @@ vector<vector<Cell>> createBoard(int& numCol, int& numRow, int& numMines);
 void printBoard(const vector<vector<Cell>>& board, int& numRow, int& numCol);
 void drawGame(sf::RenderWindow& window, const int& numCol, const int& numRow, vector<vector<Cell>>& board, vector<genericButton>& buttons);
 void drawFace(sf::RenderWindow& window, const int& numCol, const int& numRow);
-void drawMineButton(sf::RenderWindow& window, const int& numCol, const int& numRow);
+void drawDebugButton(sf::RenderWindow& window, vector<genericButton>& buttons, vector<vector<Cell>>& board);
 void drawPauseButton(sf::RenderWindow& window, const int& numCol, const int& numRow, vector<genericButton>& buttons);
 void drawLeaderboardButton(sf::RenderWindow& window, const int& numCol, const int& numRow);
 void drawPlayZone(sf::RenderWindow& window, const int& numCol, const int& numRow, vector<vector<Cell>>& board);
 string chooseImage(int value);
 vector<genericButton> createButtonsVector();
+void showNearByTiles(vector<vector<Cell>>& board, int numRow, int numCol, int& click_x, int& click_y);
+void showAllMines(vector<vector<Cell>>& board);
+void showAllMinesDebug(vector<vector<Cell>>& board);
+void hideAllMinesDebug(vector<vector<Cell>>& board);
 
 int main() {
 
@@ -149,20 +153,16 @@ vector<vector<Cell>> createBoard(int& numCol, int& numRow, int& numMines){
         }
     }
 
+
     //initiate mines at random positions
-    srand(static_cast<unsigned>(time(nullptr)));
+    srand(time(0));
 
     for(int x = 0 ; x < numMines ; x++){
+
         int randomRow = rand() % numRow;
         int randomCol = rand() % numCol;
 
-        for(int i = 0 ;  i < numRow ; i++){
-            for (int j = 0 ; j < numCol; j++){
-                if(board[i][j].position == sf::Vector2f (float(randomRow), float(randomCol))){
-                    board[i][j].value = 9;
-                }
-            }
-        }
+        board[randomRow][randomCol].value = 9;
     }
 
     for (int i = 0 ; i < numRow ; i++){
@@ -202,7 +202,7 @@ void printBoard(const vector<vector<Cell>>& board, int& numRow, int& numCol){
 
 void drawGame(sf::RenderWindow& window, const int& numCol, const int& numRow, vector<vector<Cell>>& board, vector<genericButton>& buttons){
     drawFace(window, numCol, numRow);
-    drawMineButton(window, numCol, numRow);
+    drawDebugButton(window, buttons, board);
     drawPauseButton(window, numCol, numRow, buttons);
     drawLeaderboardButton(window, numCol, numRow);
     drawPlayZone(window, numCol, numRow, board);
@@ -226,21 +226,43 @@ void drawFace(sf::RenderWindow& window, const int& numCol, const int& numRow){
     window.draw(faceSprite);
 }
 
-void drawMineButton(sf::RenderWindow& window, const int& numCol, const int& numRow){
-    float x = ((float(numCol)) * 32) - 304;
-    float y = 32 * (float(numRow) + 0.5f);
-    sf::Texture mineTexture;
-    mineTexture.loadFromFile("Images/debug.png");
+void drawDebugButton(sf::RenderWindow& window, vector<genericButton>& buttons, vector<vector<Cell>>& board){
+    float x = ((float(board[1].size())) * 32) - 304;
+    float y = 32 * (float(board.size()) + 0.5f);
 
-    sf::RectangleShape mineRectangle(sf::Vector2f(64,64));
-    mineRectangle.setPosition(x, y);
+    for(int i = 0 ; i < buttons.size() ; i++){
+        if(buttons[i].type == "debug"){
+            sf::Texture mineTexture;
+            mineTexture.loadFromFile("Images/debug.png");
 
-    sf::Sprite mineSprite;
-    mineSprite.setTexture(mineTexture);
-    mineSprite.setTextureRect(sf::IntRect(0, 0, 64, 64));
-    mineSprite.setPosition(x, y);
-    window.draw(mineRectangle);
-    window.draw(mineSprite);
+            sf::RectangleShape mineRectangle(sf::Vector2f(64,64));
+            mineRectangle.setPosition(x, y);
+
+            sf::Sprite mineSprite;
+            mineSprite.setTexture(mineTexture);
+            mineSprite.setTextureRect(sf::IntRect(0, 0, 64, 64));
+            mineSprite.setPosition(x, y);
+
+            if(sf::Mouse::isButtonPressed(sf::Mouse::Left)){
+                sf::Vector2i clickPosition = sf::Mouse::getPosition(window);
+                if(mineRectangle.getGlobalBounds().contains(sf::Vector2f(clickPosition))){
+                    if(!buttons[i].clicked){
+                        showAllMinesDebug(board);
+                        buttons[i].clicked = true;
+                    }
+                    else{
+                        hideAllMinesDebug(board);
+                        buttons[i].clicked = false;
+                    }
+
+                }
+            }
+
+            window.draw(mineRectangle);
+            window.draw(mineSprite);
+        }
+    }
+
 }
 
 void drawPauseButton(sf::RenderWindow& window, const int& numCol, const int& numRow, vector<genericButton>& buttons){
@@ -313,7 +335,23 @@ void drawPlayZone(sf::RenderWindow& window, const int& numCol, const int& numRow
             if(sf::Mouse::isButtonPressed(sf::Mouse::Left)){
                 sf::Vector2i clickPosition = sf::Mouse::getPosition(window);
                 if(tileRectangle.getGlobalBounds().contains(sf::Vector2f(clickPosition))){
-                    board[i][j].imagePath = chooseImage(board[i][j].value);
+
+                    if(board[i][j].value == 9){
+                        showAllMines(board);
+                    }
+                    else{
+                        board[i][j].revealed = true;
+                        board[i][j].imagePath = chooseImage(board[i][j].value);
+                        showNearByTiles(board, numRow, numCol, i, j);
+                    }
+                }
+            }
+
+            if(sf::Mouse::isButtonPressed(sf::Mouse::Right)){
+                sf::Vector2i clickPosition = sf::Mouse::getPosition(window);
+                if(tileRectangle.getGlobalBounds().contains(sf::Vector2f(clickPosition))){
+                    board[i][j].flagged = true;
+                    board[i][j].imagePath = "Images/flag_revealed.png";
                 }
             }
 
@@ -359,4 +397,53 @@ vector<genericButton> createButtonsVector(){
     buttons.push_back(debugButton);
 
     return buttons;
+}
+
+void showNearByTiles(vector<vector<Cell>>& board, int numRow, int numCol, int& click_x, int& click_y){
+    for(int x = max(click_x-1, 0); x <= min(click_x+1, numRow-1) ; x++){
+        for(int y = max(click_y-1, 0); y <= min(click_y+1, numCol-1) ; y++){
+            if(board[x][y].value == 0 && !board[x][y].revealed){
+                board[x][y].revealed = true;
+                board[x][y].imagePath = chooseImage(board[x][y].value);
+                showNearByTiles(board, numRow, numCol, x, y);
+            }
+            else if(board[x][y].value >= 1 && board[x][y].value <= 8 && !board[x][y].revealed){
+                board[x][y].revealed = true;
+                board[x][y].imagePath = chooseImage(board[x][y].value);
+            }
+        }
+    }
+}
+
+void showAllMines(vector<vector<Cell>>& board){
+    for(int i = 0 ; i < board.size() ; i++){
+        for(int j = 0 ; j < board[i].size() ; j++){
+            if(board[i][j].value == 9){
+                board[i][j].revealed = true;
+                board[i][j].imagePath = chooseImage(9);
+            }
+        }
+    }
+}
+
+void showAllMinesDebug(vector<vector<Cell>>& board){
+    for(int i = 0 ; i < board.size() ; i++){
+        for(int j = 0 ; j < board[i].size() ; j++){
+            if(board[i][j].value == 9){
+                board[i][j].revealed = true;
+                board[i][j].imagePath = "Images/mine_debug.png";
+            }
+        }
+    }
+}
+
+void hideAllMinesDebug(vector<vector<Cell>>& board){
+    for(int i = 0 ; i < board.size() ; i++){
+        for(int j = 0 ; j < board[i].size() ; j++){
+            if(board[i][j].value == 9){
+                board[i][j].revealed = false;
+                board[i][j].imagePath = "Images/tile_hidden.png";
+            }
+        }
+    }
 }

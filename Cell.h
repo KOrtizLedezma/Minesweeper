@@ -15,11 +15,15 @@ public:
     int value;
     string imagePath;
     sf::Vector2f position;
+    bool revealed;
+    bool flagged;
 
     Cell() {
        this->value = value;
        this-> imagePath = "Images/tile_hidden.png";
        this->position = position;
+       this->revealed = false;
+       this->flagged = false;
     }
 };
 

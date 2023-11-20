@@ -14,10 +14,12 @@ class genericButton {
 public:
     string imagePath;
     string type;
+    bool clicked;
 
     genericButton() {
         this-> imagePath = "";
         this-> type = "";
+        this-> clicked = false;
     }
 };
 
