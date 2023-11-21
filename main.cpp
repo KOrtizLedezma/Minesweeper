@@ -1,6 +1,7 @@
 #include <fstream>
 #include <string>
 #include <SFML/Graphics.hpp>
+#include <SFML/System/Clock.hpp>
 #include <vector>
 #include <iostream>
 #include <chrono>
@@ -12,17 +13,15 @@ using namespace std;
 void setText(sf::Text &text, float x, float y);
 void readConfigFile(int& numCol, int& numRow, int& numMines);
 vector<vector<Cell>> createBoard(int& numCol, int& numRow, int& numMines);
-__attribute__((unused)) void printBoard(const vector<vector<Cell>>& board, int& numRow, int& numCol);
-void drawGame(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<genericButton>& buttons, bool& game);
+void drawGame(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<genericButton>& buttons);
 void drawFace(sf::RenderWindow& window, vector<vector<Cell>>& board);
 void drawDebugButton(sf::RenderWindow& window, vector<genericButton>& buttons, vector<vector<Cell>>& board);
 void drawPauseButton(sf::RenderWindow& window, vector<genericButton>& buttons, vector<vector<Cell>>& board);
 void drawLeaderboardButton(sf::RenderWindow& window, vector<vector<Cell>>& board);
-void drawPlayZone(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<genericButton>& buttons, bool& game);
+void drawPlayZone(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<genericButton>& buttons);
 string chooseImage(int value);
 vector<genericButton> createButtonsVector();
 void showNearByTiles(vector<vector<Cell>>& board, int numRow, int numCol, int& click_x, int& click_y);
-void printBoolBoard(const vector<vector<Cell>>& board, int numRow, int numCol);
 void revealAllMines(vector<vector<Cell>>& board);
 void drawCounter(sf::RenderWindow& window, const vector<vector<Cell>>& board, const string& value);
 void drawTile(sf::RenderWindow& window, const Cell& cell);
@@ -35,17 +34,23 @@ string validateNumber(string& number);
 void drawClock(sf::RenderWindow& window, const vector<vector<Cell>>& board, const string & value);
 string secondsToMinutes(string seconds);
 void makeTime(sf::RenderWindow& window, vector<vector<Cell>>& board);
+void togglePause();
+bool checkIfWinner(vector<vector<Cell>>& board);
 
-chrono::time_point<chrono::steady_clock> start;
+// Global variables, needed to avoid clock, or states in the game update each frame
+sf::Clock clockNew;
+string stoppedTime;
 
 bool started = false;
+bool paused = false;
+bool gameOver = false;
+bool winner = false;
 
 int main() {
 
     enum State { Welcome, Game };
     State currentState = Welcome;
 
-    bool game = true;
     int rowCount = 0;
     int colCount = 0;
     int minesCount = 0;
@@ -125,7 +130,7 @@ int main() {
                 break;
             case Game:
                 window.clear(sf::Color::White);
-                drawGame(window, board, buttons, game);
+                drawGame(window, board, buttons);
                 break;
         }
         inputName.setString(name + "|");
@@ -210,43 +215,16 @@ vector<vector<Cell>> createBoard(int& numCol, int& numRow, int& numMines){
         }
     }
 
-    printBoard(board, numRow, numCol);
-
     return board;
 }
 
-// Prints all the values on the board
-__attribute__((unused)) void printBoard(const vector<vector<Cell>>& board, int& numRow, int& numCol){
-    for (int i = 0 ; i < numRow ; i++){
-        for (int j = 0 ; j < numCol ; j++){
-            if(board[i][j].value == 9){
-                cout << "X  ";
-            }
-            else{
-                cout << board[i][j].value << "  ";
-            }
-        }
-        cout << endl;
-    }
-}
-
-// Prints all the bool revealed values on the board
-void printBoolBoard(const vector<vector<Cell>>& board, int numRow, int numCol){
-    for (int i = 0 ; i < numRow ; i++){
-        for (int j = 0 ; j < numCol ; j++){
-            cout << board[i][j].revealed <<"  ";
-        }
-        cout << endl;
-    }
-}
-
 // Calls all the method needed to draw the game
-void drawGame(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<genericButton>& buttons, bool& game){
+void drawGame(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<genericButton>& buttons){
     drawFace(window, board);
     drawDebugButton(window, buttons, board);
     drawPauseButton(window, buttons, board);
     drawLeaderboardButton(window, board);
-    drawPlayZone(window, board, buttons, game);
+    drawPlayZone(window, board, buttons);
 }
 
 // Draws the face Button, and controls the clicks
@@ -254,7 +232,16 @@ void drawFace(sf::RenderWindow& window, vector<vector<Cell>>& board){
     float x = ((float(board[1].size())/2.f) * 32) - 32;
     float y = 32 * (float(board.size()) + 0.5f);
     sf::Texture faceTexture;
-    faceTexture.loadFromFile("Images/face_happy.png");
+    if(gameOver){
+        faceTexture.loadFromFile("Images/face_lose.png");
+    }
+    else if(winner){
+        faceTexture.loadFromFile("Images/face_win.png");
+    }
+    else{
+        faceTexture.loadFromFile("Images/face_happy.png");
+    }
+
 
     sf::RectangleShape faceRectangle(sf::Vector2f(64,64));
     faceRectangle.setPosition(x, y);
@@ -286,7 +273,7 @@ void drawDebugButton(sf::RenderWindow& window, vector<genericButton>& buttons, v
             mineSprite.setTextureRect(sf::IntRect(0, 0, 64, 64));
             mineSprite.setPosition(x, y);
 
-            if(sf::Mouse::isButtonPressed(sf::Mouse::Left)){
+            if(sf::Mouse::isButtonPressed(sf::Mouse::Left) && !gameOver && !winner){
                 sf::Vector2i clickPosition = sf::Mouse::getPosition(window);
                 if(mineRectangle.getGlobalBounds().contains(sf::Vector2f(clickPosition))){
                     if(!buttons[i].clicked){
@@ -325,14 +312,16 @@ void drawPauseButton(sf::RenderWindow& window, vector<genericButton>& buttons, v
             pauseSprite.setTextureRect(sf::IntRect(0, 0, 64, 64));
             pauseSprite.setPosition(x, y);
 
-            if(sf::Mouse::isButtonPressed(sf::Mouse::Left)){
+            if(sf::Mouse::isButtonPressed(sf::Mouse::Left) && !gameOver && !winner){
                 sf::Vector2i clickPosition = sf::Mouse::getPosition(window);
                 if(pauseRectangle.getGlobalBounds().contains(sf::Vector2f(clickPosition))){
                     if(buttons[i].imagePath == "Images/play.png"){
                         buttons[i].imagePath = "Images/pause.png";
+                        togglePause();
                     }
                     else if(buttons[i].imagePath == "Images/pause.png"){
                         buttons[i].imagePath = "Images/play.png";
+                        togglePause();
                     }
                 }
             }
@@ -362,7 +351,7 @@ void drawLeaderboardButton(sf::RenderWindow& window, vector<vector<Cell>>& board
 }
 
 // Draws the Play zone, all the tiles, numbers, mines and flags are drawn here, and controls the clicks
-void drawPlayZone(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<genericButton>& buttons, bool& game){
+void drawPlayZone(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<genericButton>& buttons){
     int flagCounter = 0;
     int mineCounter = 0;
     for (int i = 0 ; i < board.size() ; i++){
@@ -374,10 +363,11 @@ void drawPlayZone(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<
 
             drawTile(window, board[i][j]);
 
-            if(sf::Mouse::isButtonPressed(sf::Mouse::Left)){
+            if(sf::Mouse::isButtonPressed(sf::Mouse::Left) && !paused && !gameOver && !buttons[2].clicked && !winner){
                 sf::Vector2i clickPosition = sf::Mouse::getPosition(window);
                 if(tileRectangle.getGlobalBounds().contains(sf::Vector2f(clickPosition))){
                     if(board[i][j].value == 9){
+                        gameOver = true;
                         revealAllMines(board);
                         if(board[i][j].flagged) {board[i][j].flagged = false;}
                     }
@@ -391,7 +381,7 @@ void drawPlayZone(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<
                     }
                 }
             }
-            if(sf::Mouse::isButtonPressed(sf::Mouse::Right)){
+            if(sf::Mouse::isButtonPressed(sf::Mouse::Right) && !paused && !gameOver && !buttons[2].clicked && !winner){
                 sf::Vector2i clickPosition = sf::Mouse::getPosition(window);
                 if(tileRectangle.getGlobalBounds().contains(sf::Vector2f(clickPosition))){
                     if(!board[i][j].revealed){
@@ -408,7 +398,6 @@ void drawPlayZone(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<
             }
 
             if(board[i][j].itsMine && buttons[2].clicked){
-                board[i][j].imagePath = "Images/tile_revealed.png";
                 drawMine(window, board[i][j]);
             }
 
@@ -422,6 +411,8 @@ void drawPlayZone(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<
     string counter = to_string(mineCounter - flagCounter);
     counter = validateNumber(counter);
     drawCounter(window, board, counter);
+
+    winner = checkIfWinner(board);
 }
 
 // Choose the correct image path
@@ -551,7 +542,7 @@ void drawFlag(sf::RenderWindow& window, Cell& cell){
 // Draws the mines on the board
 void drawMine(sf::RenderWindow& window, Cell& cell){
     sf::Texture mineTexture;
-    mineTexture.loadFromFile("Images/flag.png");
+    mineTexture.loadFromFile("Images/mine.png");
     sf::Sprite mineSprite;
     mineSprite.setTexture(mineTexture);
     mineSprite.setTextureRect(sf::IntRect(0, 0, 32, 32));
@@ -650,13 +641,41 @@ string secondsToMinutes(string seconds){
 }
 
 void makeTime(sf::RenderWindow& window, vector<vector<Cell>>& board){
-    if(!started){
-        start = chrono::steady_clock::now();
+    if (!started && !paused) {
+        clockNew.restart();  // Start the clock
         started = true;
     }
-    auto end = chrono::steady_clock::now();
-    auto ms = chrono::duration_cast<chrono::milliseconds>(end - start);
-    string time = to_string(ms.count() / 1000);
-    string t = secondsToMinutes(time);
-    drawClock(window, board, t);
+
+    if (!paused) {
+        sf::Time elapsed = clockNew.getElapsedTime();
+        string time = to_string(elapsed.asSeconds());
+        string t = secondsToMinutes(time);
+        stoppedTime = t;
+        drawClock(window, board, t);
+    }
+    if(paused){
+        drawClock(window, board, stoppedTime);
+    }
+    if(gameOver){
+        clockNew.restart();
+    }
+    if(winner){
+        clockNew.restart();
+    }
+}
+
+void togglePause() {
+    paused = !paused;
+}
+
+bool checkIfWinner(vector<vector<Cell>>& board){
+    bool trueWinner = true;
+    for(int i = 0 ; i < board.size() ; i++){
+        for(int j = 0; j < board[i].size() ; j++){
+            if(!board[i][j].revealed && board[i][j].value != 9){
+                trueWinner = false;
+            }
+        }
+    }
+    return trueWinner;
 }
