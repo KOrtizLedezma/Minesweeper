@@ -11,25 +11,25 @@ using namespace std;
 void setText(sf::Text &text, float x, float y);
 void readConfigFile(int& numCol, int& numRow, int& numMines);
 vector<vector<Cell>> createBoard(int& numCol, int& numRow, int& numMines);
-void printBoard(const vector<vector<Cell>>& board, int& numRow, int& numCol);
-void drawGame(sf::RenderWindow& window, const int& numCol, const int& numRow, vector<vector<Cell>>& board, vector<genericButton>& buttons);
-void drawFace(sf::RenderWindow& window, const int& numCol, const int& numRow);
+__attribute__((unused)) void printBoard(const vector<vector<Cell>>& board, int& numRow, int& numCol);
+void drawGame(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<genericButton>& buttons, bool& game);
+void drawFace(sf::RenderWindow& window, vector<vector<Cell>>& board);
 void drawDebugButton(sf::RenderWindow& window, vector<genericButton>& buttons, vector<vector<Cell>>& board);
-void drawPauseButton(sf::RenderWindow& window, const int& numCol, const int& numRow, vector<genericButton>& buttons);
-void drawLeaderboardButton(sf::RenderWindow& window, const int& numCol, const int& numRow);
-void drawPlayZone(sf::RenderWindow& window, const int& numCol, const int& numRow, vector<vector<Cell>>& board);
+void drawPauseButton(sf::RenderWindow& window, vector<genericButton>& buttons, vector<vector<Cell>>& board);
+void drawLeaderboardButton(sf::RenderWindow& window, vector<vector<Cell>>& board);
+void drawPlayZone(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<genericButton>& buttons, bool& game);
 string chooseImage(int value);
 vector<genericButton> createButtonsVector();
 void showNearByTiles(vector<vector<Cell>>& board, int numRow, int numCol, int& click_x, int& click_y);
-void showAllMines(vector<vector<Cell>>& board);
-void showAllMinesDebug(vector<vector<Cell>>& board);
-void hideAllMinesDebug(vector<vector<Cell>>& board);
+void printBoolBoard(const vector<vector<Cell>>& board, int numRow, int numCol);
+void revealAllMines(vector<vector<Cell>>& board);
 
 int main() {
 
     enum State { Welcome, Game };
     State currentState = Welcome;
 
+    bool game = true;
     int rowCount = 0;
     int colCount = 0;
     int minesCount = 0;
@@ -41,7 +41,7 @@ int main() {
     const int height = (rowCount * 32) + 100;
 
     vector<vector<Cell>> board = createBoard(colCount, rowCount, minesCount);
-    printBoard(board, rowCount, colCount);
+    //printBoard(board, rowCount, colCount);
 
     sf::RenderWindow window(sf::VideoMode(width, height), "Minesweeper");
     sf::Font font;
@@ -80,6 +80,8 @@ int main() {
                     if(!name.empty()){
                         name.pop_back();
                     }
+                    sf::FloatRect textRect = inputName.getLocalBounds();
+                    inputName.setOrigin(textRect.left + textRect.width/2.0f,textRect.top + textRect.height/2.0f);
                 }
                 else if(isalpha(event.text.unicode)){
                     if(name.empty()){
@@ -107,7 +109,7 @@ int main() {
                 break;
             case Game:
                 window.clear(sf::Color::White);
-                drawGame(window, colCount, rowCount, board, buttons);
+                drawGame(window, board, buttons, game);
                 break;
         }
         inputName.setString(name + "|");
@@ -116,12 +118,14 @@ int main() {
     }
 }
 
+// Sets Text on Welcome Page
 void setText(sf::Text &text, float x, float y){
     sf::FloatRect textRect = text.getLocalBounds();
     text.setOrigin(textRect.left + textRect.width/2.0f,textRect.top + textRect.height/2.0f);
     text.setPosition(sf::Vector2f(x, y));
 }
 
+// Reads the config file to get values imported
 void readConfigFile(int& numCol, int& numRow, int& numMines){
     string fileName = "Files/config.cfg";
     ifstream configFile(fileName);
@@ -140,6 +144,7 @@ void readConfigFile(int& numCol, int& numRow, int& numMines){
     numMines = values[2];
 }
 
+// Generates the board with numbers and mines
 vector<vector<Cell>> createBoard(int& numCol, int& numRow, int& numMines){
 
     vector<vector<Cell>> board(numRow, vector<Cell>(numCol));
@@ -163,6 +168,7 @@ vector<vector<Cell>> createBoard(int& numCol, int& numRow, int& numMines){
         int randomCol = rand() % numCol;
 
         board[randomRow][randomCol].value = 9;
+        board[randomRow][randomCol].itsMine = true;
     }
 
     for (int i = 0 ; i < numRow ; i++){
@@ -186,7 +192,8 @@ vector<vector<Cell>> createBoard(int& numCol, int& numRow, int& numMines){
     return board;
 }
 
-void printBoard(const vector<vector<Cell>>& board, int& numRow, int& numCol){
+// Prints all the values on the board
+__attribute__((unused)) void printBoard(const vector<vector<Cell>>& board, int& numRow, int& numCol){
     for (int i = 0 ; i < numRow ; i++){
         for (int j = 0 ; j < numCol ; j++){
             if(board[i][j].value == 9){
@@ -200,17 +207,29 @@ void printBoard(const vector<vector<Cell>>& board, int& numRow, int& numCol){
     }
 }
 
-void drawGame(sf::RenderWindow& window, const int& numCol, const int& numRow, vector<vector<Cell>>& board, vector<genericButton>& buttons){
-    drawFace(window, numCol, numRow);
-    drawDebugButton(window, buttons, board);
-    drawPauseButton(window, numCol, numRow, buttons);
-    drawLeaderboardButton(window, numCol, numRow);
-    drawPlayZone(window, numCol, numRow, board);
+// Prints all the bool revealed values on the board
+void printBoolBoard(const vector<vector<Cell>>& board, int numRow, int numCol){
+    for (int i = 0 ; i < numRow ; i++){
+        for (int j = 0 ; j < numCol ; j++){
+            cout << board[i][j].revealed <<"  ";
+        }
+        cout << endl;
+    }
 }
 
-void drawFace(sf::RenderWindow& window, const int& numCol, const int& numRow){
-    float x = ((float(numCol)/2.f) * 32) - 32;
-    float y = 32 * (float(numRow) + 0.5f);
+// Calls all the method needed to draw the game
+void drawGame(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<genericButton>& buttons, bool& game){
+    drawFace(window, board);
+    drawDebugButton(window, buttons, board);
+    drawPauseButton(window, buttons, board);
+    drawLeaderboardButton(window, board);
+    drawPlayZone(window, board, buttons, game);
+}
+
+// Draws the face Button, and controls the clicks
+void drawFace(sf::RenderWindow& window, vector<vector<Cell>>& board){
+    float x = ((float(board[1].size())/2.f) * 32) - 32;
+    float y = 32 * (float(board.size()) + 0.5f);
     sf::Texture faceTexture;
     faceTexture.loadFromFile("Images/face_happy.png");
 
@@ -226,6 +245,7 @@ void drawFace(sf::RenderWindow& window, const int& numCol, const int& numRow){
     window.draw(faceSprite);
 }
 
+// Draws the Debug Button, and controls the clicks
 void drawDebugButton(sf::RenderWindow& window, vector<genericButton>& buttons, vector<vector<Cell>>& board){
     float x = ((float(board[1].size())) * 32) - 304;
     float y = 32 * (float(board.size()) + 0.5f);
@@ -247,16 +267,15 @@ void drawDebugButton(sf::RenderWindow& window, vector<genericButton>& buttons, v
                 sf::Vector2i clickPosition = sf::Mouse::getPosition(window);
                 if(mineRectangle.getGlobalBounds().contains(sf::Vector2f(clickPosition))){
                     if(!buttons[i].clicked){
-                        showAllMinesDebug(board);
                         buttons[i].clicked = true;
                     }
                     else{
-                        hideAllMinesDebug(board);
                         buttons[i].clicked = false;
                     }
 
                 }
             }
+
 
             window.draw(mineRectangle);
             window.draw(mineSprite);
@@ -265,9 +284,10 @@ void drawDebugButton(sf::RenderWindow& window, vector<genericButton>& buttons, v
 
 }
 
-void drawPauseButton(sf::RenderWindow& window, const int& numCol, const int& numRow, vector<genericButton>& buttons){
-    float x = ((float(numCol)) * 32) - 240;
-    float y = 32 * (float(numRow) + 0.5f);
+// Draws the pause Button, and controls the clicks
+void drawPauseButton(sf::RenderWindow& window, vector<genericButton>& buttons, vector<vector<Cell>>& board){
+    float x = ((float(board[1].size())) * 32) - 240;
+    float y = 32 * (float(board.size()) + 0.5f);
 
     for(int i = 0 ; i < buttons.size() ; i++){
         if(buttons[i].type == "pause"){
@@ -300,9 +320,10 @@ void drawPauseButton(sf::RenderWindow& window, const int& numCol, const int& num
     }
 }
 
-void drawLeaderboardButton(sf::RenderWindow& window, const int& numCol, const int& numRow){
-    float x = ((float(numCol)) * 32) - 176;
-    float y = 32 * (float(numRow) + 0.5f);
+// Draws the Leaderboard Button, and controls the clicks
+void drawLeaderboardButton(sf::RenderWindow& window, vector<vector<Cell>>& board){
+    float x = ((float(board[1].size())) * 32) - 176;
+    float y = 32 * (float(board.size()) + 0.5f);
     sf::Texture leaderboardTexture;
     leaderboardTexture.loadFromFile("Images/leaderboard.png");
 
@@ -317,10 +338,11 @@ void drawLeaderboardButton(sf::RenderWindow& window, const int& numCol, const in
     window.draw(leaderboardSprite);
 }
 
-void drawPlayZone(sf::RenderWindow& window, const int& numCol, const int& numRow, vector<vector<Cell>>& board){
+// Draws the Play zone, all the tiles, numbers, mines and flags are drawn here, and controls the clicks
+void drawPlayZone(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<genericButton>& buttons, bool& game){
 
-    for (int i = 0 ; i < numRow ; i++){
-        for (int j = 0 ; j < numCol ; j++){
+    for (int i = 0 ; i < board.size() ; i++){
+        for (int j = 0 ; j < board[i].size() ; j++){
             sf::Texture tileTexture;
             tileTexture.loadFromFile(board[i][j].imagePath);
 
@@ -335,18 +357,24 @@ void drawPlayZone(sf::RenderWindow& window, const int& numCol, const int& numRow
             if(sf::Mouse::isButtonPressed(sf::Mouse::Left)){
                 sf::Vector2i clickPosition = sf::Mouse::getPosition(window);
                 if(tileRectangle.getGlobalBounds().contains(sf::Vector2f(clickPosition))){
-
                     if(board[i][j].value == 9){
-                        showAllMines(board);
+                        revealAllMines(board);
+                        game = false;
+                        if(board[i][j].flagged){
+                            board[i][j].flagged = false;
+                        }
                     }
                     else{
                         board[i][j].revealed = true;
                         board[i][j].imagePath = chooseImage(board[i][j].value);
-                        showNearByTiles(board, numRow, numCol, i, j);
+                        showNearByTiles(board, board.size(), board[i].size(), i, j);
+                        printBoolBoard(board, board.size(), board[i].size());
+                        if(board[i][j].flagged){
+                            board[i][j].flagged = false;
+                        }
                     }
                 }
             }
-
             if(sf::Mouse::isButtonPressed(sf::Mouse::Right)){
                 sf::Vector2i clickPosition = sf::Mouse::getPosition(window);
                 if(tileRectangle.getGlobalBounds().contains(sf::Vector2f(clickPosition))){
@@ -354,29 +382,57 @@ void drawPlayZone(sf::RenderWindow& window, const int& numCol, const int& numRow
                     board[i][j].imagePath = "Images/flag_revealed.png";
                 }
             }
-
-            window.draw(tileRectangle);
+            if(board[i][j].revealed){
+                sf::Texture revealedTexture;
+                revealedTexture.loadFromFile("Images/tile_revealed.png");
+                sf::Sprite revealedSprite;
+                revealedSprite.setTexture(revealedTexture);
+                revealedSprite.setTextureRect(sf::IntRect(0, 0, 32, 32));
+                revealedSprite.setPosition((board[i][j].position.x * 32), (board[i][j].position.y * 32) );
+                window.draw(revealedSprite);
+            }
             window.draw(tileSprite);
+            if(board[i][j].flagged){
+                sf::Texture revealedTexture;
+                revealedTexture.loadFromFile("Images/flag.png");
+                sf::Sprite revealedSprite;
+                revealedSprite.setTexture(revealedTexture);
+                revealedSprite.setTextureRect(sf::IntRect(0, 0, 32, 32));
+                revealedSprite.setPosition((board[i][j].position.x * 32), (board[i][j].position.y * 32) );
+                window.draw(revealedSprite);
+            }
+
+            if(board[i][j].itsMine && buttons[2].clicked){
+                sf::Texture revealedTexture;
+                revealedTexture.loadFromFile("Images/mine.png");
+                sf::Sprite revealedSprite;
+                revealedSprite.setTexture(revealedTexture);
+                revealedSprite.setTextureRect(sf::IntRect(0, 0, 32, 32));
+                revealedSprite.setPosition((board[i][j].position.x * 32), (board[i][j].position.y * 32) );
+                window.draw(revealedSprite);
+            }
         }
     }
 }
 
+// Choose the correct image path
 string chooseImage(int value){
     string path;
     if(value == 0) path = "Images/tile_revealed.png";
-    else if(value == 1) path = "Images/number_1_revealed.png";
-    else if(value == 2) path = "Images/number_2_revealed.png";
-    else if(value == 3) path = "Images/number_3_revealed.png";
-    else if(value == 4) path = "Images/number_4_revealed.png";
-    else if(value == 5) path = "Images/number_5_revealed.png";
-    else if(value == 6) path = "Images/number_6_revealed.png";
-    else if(value == 7) path = "Images/number_7_revealed.png";
-    else if(value == 8) path = "Images/number_8_revealed.png";
-    else path = "Images/mine_revealed.png";
+    else if(value == 1) path = "Images/number_1.png";
+    else if(value == 2) path = "Images/number_2.png";
+    else if(value == 3) path = "Images/number_3.png";
+    else if(value == 4) path = "Images/number_4.png";
+    else if(value == 5) path = "Images/number_5.png";
+    else if(value == 6) path = "Images/number_6.png";
+    else if(value == 7) path = "Images/number_7.png";
+    else if(value == 8) path = "Images/number_8.png";
+    else path = "Images/mine.png";
 
     return path;
 }
 
+// Creates a vector that holds all the buttons
 vector<genericButton> createButtonsVector(){
 
     vector<genericButton> buttons;
@@ -399,6 +455,7 @@ vector<genericButton> createButtonsVector(){
     return buttons;
 }
 
+// Shows all nearby tiles when its clicked
 void showNearByTiles(vector<vector<Cell>>& board, int numRow, int numCol, int& click_x, int& click_y){
     for(int x = max(click_x-1, 0); x <= min(click_x+1, numRow-1) ; x++){
         for(int y = max(click_y-1, 0); y <= min(click_y+1, numCol-1) ; y++){
@@ -415,34 +472,12 @@ void showNearByTiles(vector<vector<Cell>>& board, int numRow, int numCol, int& c
     }
 }
 
-void showAllMines(vector<vector<Cell>>& board){
+void revealAllMines(vector<vector<Cell>>& board){
     for(int i = 0 ; i < board.size() ; i++){
         for(int j = 0 ; j < board[i].size() ; j++){
-            if(board[i][j].value == 9){
+            if(board[i][j].itsMine){
                 board[i][j].revealed = true;
-                board[i][j].imagePath = chooseImage(9);
-            }
-        }
-    }
-}
-
-void showAllMinesDebug(vector<vector<Cell>>& board){
-    for(int i = 0 ; i < board.size() ; i++){
-        for(int j = 0 ; j < board[i].size() ; j++){
-            if(board[i][j].value == 9){
-                board[i][j].revealed = true;
-                board[i][j].imagePath = "Images/mine_debug.png";
-            }
-        }
-    }
-}
-
-void hideAllMinesDebug(vector<vector<Cell>>& board){
-    for(int i = 0 ; i < board.size() ; i++){
-        for(int j = 0 ; j < board[i].size() ; j++){
-            if(board[i][j].value == 9){
-                board[i][j].revealed = false;
-                board[i][j].imagePath = "Images/tile_hidden.png";
+                board[i][j].imagePath = "Images/mine.png";
             }
         }
     }

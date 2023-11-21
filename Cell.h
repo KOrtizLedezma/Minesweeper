@@ -17,6 +17,7 @@ public:
     sf::Vector2f position;
     bool revealed;
     bool flagged;
+    bool itsMine;
 
     Cell() {
        this->value = value;
@@ -24,6 +25,7 @@ public:
        this->position = position;
        this->revealed = false;
        this->flagged = false;
+       this->itsMine = false;
     }
 };
 
