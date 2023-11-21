@@ -3,9 +3,10 @@
 #include <SFML/Graphics.hpp>
 #include <vector>
 #include <iostream>
+#include <chrono>
+#include <sstream>
 #include "Cell.h"
 #include "genericButton.h"
-
 using namespace std;
 
 void setText(sf::Text &text, float x, float y);
@@ -23,6 +24,21 @@ vector<genericButton> createButtonsVector();
 void showNearByTiles(vector<vector<Cell>>& board, int numRow, int numCol, int& click_x, int& click_y);
 void printBoolBoard(const vector<vector<Cell>>& board, int numRow, int numCol);
 void revealAllMines(vector<vector<Cell>>& board);
+void drawCounter(sf::RenderWindow& window, const vector<vector<Cell>>& board, const string& value);
+void drawTile(sf::RenderWindow& window, const Cell& cell);
+void changeFlagValue(Cell& cell);
+void drawFlag(sf::RenderWindow& window, Cell& cell);
+void drawMine(sf::RenderWindow& window, Cell& cell);
+void drawNumber(sf::RenderWindow& window, Cell& cell);
+int chooseRightValue(const char& value);
+string validateNumber(string& number);
+void drawClock(sf::RenderWindow& window, const vector<vector<Cell>>& board, const string & value);
+string secondsToMinutes(string seconds);
+void makeTime(sf::RenderWindow& window, vector<vector<Cell>>& board);
+
+chrono::time_point<chrono::steady_clock> start;
+
+bool started = false;
 
 int main() {
 
@@ -167,6 +183,10 @@ vector<vector<Cell>> createBoard(int& numCol, int& numRow, int& numMines){
         int randomRow = rand() % numRow;
         int randomCol = rand() % numCol;
 
+        while(board[randomRow][randomCol].value == 9){
+            randomRow = rand() % numRow;
+            randomCol = rand() % numCol;
+        }
         board[randomRow][randomCol].value = 9;
         board[randomRow][randomCol].itsMine = true;
     }
@@ -189,6 +209,9 @@ vector<vector<Cell>> createBoard(int& numCol, int& numRow, int& numMines){
             board[i][j].value = counter;
         }
     }
+
+    printBoard(board, numRow, numCol);
+
     return board;
 }
 
@@ -340,79 +363,65 @@ void drawLeaderboardButton(sf::RenderWindow& window, vector<vector<Cell>>& board
 
 // Draws the Play zone, all the tiles, numbers, mines and flags are drawn here, and controls the clicks
 void drawPlayZone(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<genericButton>& buttons, bool& game){
-
+    int flagCounter = 0;
+    int mineCounter = 0;
     for (int i = 0 ; i < board.size() ; i++){
         for (int j = 0 ; j < board[i].size() ; j++){
-            sf::Texture tileTexture;
-            tileTexture.loadFromFile(board[i][j].imagePath);
-
+            if(board[i][j].flagged) flagCounter++;
+            if(board[i][j].itsMine) mineCounter++;
             sf::RectangleShape tileRectangle(sf::Vector2f(32,32));
             tileRectangle.setPosition(board[i][j].position.x * 32, board[i][j].position.y * 32);
 
-            sf::Sprite tileSprite;
-            tileSprite.setTexture(tileTexture);
-            tileSprite.setTextureRect(sf::IntRect(0, 0, 32, 32));
-            tileSprite.setPosition(board[i][j].position.x * 32, board[i][j].position.y * 32);
+            drawTile(window, board[i][j]);
 
             if(sf::Mouse::isButtonPressed(sf::Mouse::Left)){
                 sf::Vector2i clickPosition = sf::Mouse::getPosition(window);
                 if(tileRectangle.getGlobalBounds().contains(sf::Vector2f(clickPosition))){
                     if(board[i][j].value == 9){
                         revealAllMines(board);
-                        game = false;
-                        if(board[i][j].flagged){
-                            board[i][j].flagged = false;
-                        }
+                        if(board[i][j].flagged) {board[i][j].flagged = false;}
+                    }
+                    else if(0 < board[i][j].value && board[i][j].value < 9){
+                        board[i][j].revealed = true;
                     }
                     else{
                         board[i][j].revealed = true;
-                        board[i][j].imagePath = chooseImage(board[i][j].value);
                         showNearByTiles(board, board.size(), board[i].size(), i, j);
-                        printBoolBoard(board, board.size(), board[i].size());
-                        if(board[i][j].flagged){
-                            board[i][j].flagged = false;
-                        }
+                        if(board[i][j].flagged) {board[i][j].flagged = false;}
                     }
                 }
             }
             if(sf::Mouse::isButtonPressed(sf::Mouse::Right)){
                 sf::Vector2i clickPosition = sf::Mouse::getPosition(window);
                 if(tileRectangle.getGlobalBounds().contains(sf::Vector2f(clickPosition))){
-                    board[i][j].flagged = true;
-                    board[i][j].imagePath = "Images/flag_revealed.png";
+                    if(!board[i][j].revealed){
+                        changeFlagValue(board[i][j]);
+                    }
                 }
             }
             if(board[i][j].revealed){
-                sf::Texture revealedTexture;
-                revealedTexture.loadFromFile("Images/tile_revealed.png");
-                sf::Sprite revealedSprite;
-                revealedSprite.setTexture(revealedTexture);
-                revealedSprite.setTextureRect(sf::IntRect(0, 0, 32, 32));
-                revealedSprite.setPosition((board[i][j].position.x * 32), (board[i][j].position.y * 32) );
-                window.draw(revealedSprite);
+                board[i][j].imagePath = "Images/tile_revealed.png";
+                drawNumber(window, board[i][j]);
             }
-            window.draw(tileSprite);
-            if(board[i][j].flagged){
-                sf::Texture revealedTexture;
-                revealedTexture.loadFromFile("Images/flag.png");
-                sf::Sprite revealedSprite;
-                revealedSprite.setTexture(revealedTexture);
-                revealedSprite.setTextureRect(sf::IntRect(0, 0, 32, 32));
-                revealedSprite.setPosition((board[i][j].position.x * 32), (board[i][j].position.y * 32) );
-                window.draw(revealedSprite);
+            if(board[i][j].flagged && !board[i][j].revealed){
+                drawFlag(window, board[i][j]);
             }
 
             if(board[i][j].itsMine && buttons[2].clicked){
-                sf::Texture revealedTexture;
-                revealedTexture.loadFromFile("Images/mine.png");
-                sf::Sprite revealedSprite;
-                revealedSprite.setTexture(revealedTexture);
-                revealedSprite.setTextureRect(sf::IntRect(0, 0, 32, 32));
-                revealedSprite.setPosition((board[i][j].position.x * 32), (board[i][j].position.y * 32) );
-                window.draw(revealedSprite);
+                board[i][j].imagePath = "Images/tile_revealed.png";
+                drawMine(window, board[i][j]);
             }
+
+            //drawCounter(window, minesCount, board);
         }
     }
+
+
+    makeTime(window, board);
+
+    string counter = to_string(mineCounter - flagCounter);
+    counter = validateNumber(counter);
+    drawCounter(window, board, counter);
 }
 
 // Choose the correct image path
@@ -472,6 +481,7 @@ void showNearByTiles(vector<vector<Cell>>& board, int numRow, int numCol, int& c
     }
 }
 
+// Show all the mines on the board
 void revealAllMines(vector<vector<Cell>>& board){
     for(int i = 0 ; i < board.size() ; i++){
         for(int j = 0 ; j < board[i].size() ; j++){
@@ -481,4 +491,172 @@ void revealAllMines(vector<vector<Cell>>& board){
             }
         }
     }
+}
+
+// Draws the mine counter
+void drawCounter(sf::RenderWindow& window, const vector<vector<Cell>>& board, const string & value){
+    int sprite1Pos = chooseRightValue(value[0]);
+    int sprite2Pos = chooseRightValue(value[1]);
+    int sprite3Pos = chooseRightValue(value[2]);
+    sf::Texture tileTexture1;
+    tileTexture1.loadFromFile("Images/digits.png");
+    sf::Sprite tileSprite1;
+    tileSprite1.setTexture(tileTexture1);
+    tileSprite1.setTextureRect(sf::IntRect(21*sprite1Pos, 0, 21, 32));
+    tileSprite1.setPosition(33, 32 * (board.size() + 0.5) + 16);
+    window.draw(tileSprite1);
+    sf::Texture tileTexture2;
+    tileTexture2.loadFromFile("Images/digits.png");
+    sf::Sprite tileSprite2;
+    tileSprite2.setTexture(tileTexture2);
+    tileSprite2.setTextureRect(sf::IntRect(21*sprite2Pos, 0, 21, 32));
+    tileSprite2.setPosition(54, 32 * (board.size() + 0.5) + 16);
+    window.draw(tileSprite2);
+    sf::Texture tileTexture3;
+    tileTexture3.loadFromFile("Images/digits.png");
+    sf::Sprite tileSprite3;
+    tileSprite3.setTexture(tileTexture3);
+    tileSprite3.setTextureRect(sf::IntRect(21*sprite3Pos, 0, 21, 32));
+    tileSprite3.setPosition(75, 32 * (board.size() + 0.5) + 16);
+    window.draw(tileSprite3);
+}
+
+// Draws the tiles on the board
+void drawTile(sf::RenderWindow& window, const Cell& cell){
+    sf::Texture tileTexture;
+    tileTexture.loadFromFile(cell.imagePath);
+    sf::Sprite tileSprite;
+    tileSprite.setTexture(tileTexture);
+    tileSprite.setTextureRect(sf::IntRect(0, 0, 32, 32));
+    tileSprite.setPosition(cell.position.x * 32, cell.position.y * 32);
+    window.draw(tileSprite);
+}
+
+// Changes the value flagged on the cell
+void changeFlagValue(Cell& cell){
+    cell.flagged = !cell.flagged;
+}
+
+// Draws the flag on the board
+void drawFlag(sf::RenderWindow& window, Cell& cell){
+    sf::Texture flagTexture;
+    flagTexture.loadFromFile("Images/flag.png");
+    sf::Sprite flagSprite;
+    flagSprite.setTexture(flagTexture);
+    flagSprite.setTextureRect(sf::IntRect(0, 0, 32, 32));
+    flagSprite.setPosition((cell.position.x * 32), (cell.position.y * 32) );
+    window.draw(flagSprite);
+}
+
+// Draws the mines on the board
+void drawMine(sf::RenderWindow& window, Cell& cell){
+    sf::Texture mineTexture;
+    mineTexture.loadFromFile("Images/flag.png");
+    sf::Sprite mineSprite;
+    mineSprite.setTexture(mineTexture);
+    mineSprite.setTextureRect(sf::IntRect(0, 0, 32, 32));
+    mineSprite.setPosition((cell.position.x * 32), (cell.position.y * 32) );
+    window.draw(mineSprite);
+}
+
+// Draws the numbers on the board
+void drawNumber(sf::RenderWindow& window, Cell& cell){
+    sf::Texture numberTexture;
+    numberTexture.loadFromFile(chooseImage(cell.value));
+    sf::Sprite numberSprite;
+    numberSprite.setTexture(numberTexture);
+    numberSprite.setTextureRect(sf::IntRect(0, 0, 32, 32));
+    numberSprite.setPosition((cell.position.x * 32), (cell.position.y * 32) );
+    window.draw(numberSprite);
+}
+
+// choose the value to move the image for the counter
+int chooseRightValue(const char& value){
+    if(value == '-') return 10;
+    else if(value == '0') return 0;
+    else if(value == '1') return 1;
+    else if(value == '2') return 2;
+    else if(value == '3') return 3;
+    else if(value == '4') return 4;
+    else if(value == '5') return 5;
+    else if(value == '6') return 6;
+    else if(value == '7') return 7;
+    else if(value == '8') return 8;
+    else return 9;
+}
+
+// Makes sure that the string to display is 3 digits long
+string validateNumber(string& number){
+    while(number.size() < 3){
+        number = "0" + number;
+    }
+    return number;
+}
+
+void drawClock(sf::RenderWindow& window, const vector<vector<Cell>>& board, const string & value){
+    int sprite1Pos = chooseRightValue(value[0]);
+    int sprite2Pos = chooseRightValue(value[1]);
+    int sprite3Pos = chooseRightValue(value[2]);
+    int sprite4Pos = chooseRightValue(value[3]);
+    sf::Texture tileTexture1;
+    tileTexture1.loadFromFile("Images/digits.png");
+    sf::Sprite tileSprite1;
+    tileSprite1.setTexture(tileTexture1);
+    tileSprite1.setTextureRect(sf::IntRect(21*sprite1Pos, 0, 21, 32));
+    tileSprite1.setPosition((board[1].size() * 32) - 97, 32 * (board.size() + 0.5) + 16);
+    window.draw(tileSprite1);
+    sf::Texture tileTexture2;
+    tileTexture2.loadFromFile("Images/digits.png");
+    sf::Sprite tileSprite2;
+    tileSprite2.setTexture(tileTexture2);
+    tileSprite2.setTextureRect(sf::IntRect(21*sprite2Pos, 0, 21, 32));
+    tileSprite2.setPosition((board[1].size() * 32) - 76, 32 * (board.size() + 0.5) + 16);
+    window.draw(tileSprite2);
+    sf::Texture tileTexture3;
+    tileTexture3.loadFromFile("Images/digits.png");
+    sf::Sprite tileSprite3;
+    tileSprite3.setTexture(tileTexture3);
+    tileSprite3.setTextureRect(sf::IntRect(21*sprite3Pos, 0, 21, 32));
+    tileSprite3.setPosition((board[1].size() * 32) - 54, 32 * (board.size() + 0.5) + 16);
+    window.draw(tileSprite3);
+    sf::Texture tileTexture4;
+    tileTexture4.loadFromFile("Images/digits.png");
+    sf::Sprite tileSprite4;
+    tileSprite4.setTexture(tileTexture4);
+    tileSprite4.setTextureRect(sf::IntRect(21*sprite4Pos, 0, 21, 32));
+    tileSprite4.setPosition((board[1].size() * 32) - 33, 32 * (board.size() + 0.5) + 16);
+    window.draw(tileSprite4);
+}
+
+string secondsToMinutes(string seconds){
+    int sec = stoi(seconds);
+    int minutes = sec / 60;
+    int remainingSeconds = sec % 60;
+
+    stringstream ss;
+    if(to_string(minutes).size() < 2){
+        ss << "0" << minutes;
+    }
+    else{
+        ss << minutes;
+    }
+    if(to_string(remainingSeconds).size() < 2){
+        ss << "0" << remainingSeconds;
+    }
+    else{
+        ss << remainingSeconds;
+    }
+    return ss.str();
+}
+
+void makeTime(sf::RenderWindow& window, vector<vector<Cell>>& board){
+    if(!started){
+        start = chrono::steady_clock::now();
+        started = true;
+    }
+    auto end = chrono::steady_clock::now();
+    auto ms = chrono::duration_cast<chrono::milliseconds>(end - start);
+    string time = to_string(ms.count() / 1000);
+    string t = secondsToMinutes(time);
+    drawClock(window, board, t);
 }
