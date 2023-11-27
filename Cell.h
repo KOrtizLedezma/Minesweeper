@@ -18,6 +18,7 @@ public:
     bool revealed;
     bool flagged;
     bool itsMine;
+    vector<Cell*> surroundingCells;
 
     Cell() {
        this->value = value;

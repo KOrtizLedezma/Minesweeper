@@ -21,7 +21,6 @@ void drawLeaderboardButton(sf::RenderWindow& window, vector<vector<Cell>>& board
 void drawPlayZone(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<genericButton>& buttons);
 string chooseImage(int value);
 vector<genericButton> createButtonsVector();
-void showNearByTiles(vector<vector<Cell>>& board, int numRow, int numCol, int& click_x, int& click_y);
 void revealAllMines(vector<vector<Cell>>& board);
 void drawCounter(sf::RenderWindow& window, const vector<vector<Cell>>& board, const string& value);
 void drawTile(sf::RenderWindow& window, const Cell& cell);
@@ -44,6 +43,9 @@ void hideAllTiles(vector<vector<Cell>>& board);
 void returnValueBoard(vector<vector<Cell>>& board, vector<vector<bool>>& states);
 vector<vector<bool>> initializeStatesBoard(int& row, int& col);
 void drawLeaderboardStuff(sf::RenderWindow& leaderboardWindow, vector<vector<Cell>>& board);
+vector<string> readHighScores();
+void writeHighScores(string newScore);
+void showNearbyTiles(Cell& cell);
 
 // Global variables, needed to avoid clock, or states in the game update each frame
 sf::Clock clockNew;
@@ -224,6 +226,22 @@ vector<vector<Cell>> createBoard(int& numCol, int& numRow, int& numMines){
             }
 
             board[i][j].value = counter;
+        }
+    }
+
+    for(int i = 0; i < numRow; i++) {
+        for(int j = 0; j < numCol; j++) {
+            Cell& current = board[i][j];
+
+            for(int di = -1; di <= 1; di++) {
+                for(int dj = -1; dj <= 1; dj++) {
+                    if (i + di >= 0 && i + di < numRow &&
+                        j + dj >= 0 && j + dj < numCol) {
+
+                        current.surroundingCells.push_back(&board[i + di][j + dj]);
+                    }
+                }
+            }
         }
     }
 
@@ -437,7 +455,8 @@ void drawPlayZone(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<
                     }
                     else{
                         board[i][j].revealed = true;
-                        showNearByTiles(board, board.size(), board[i].size(), i, j);
+                        //showNearByTiles(board, board.size(), board[i].size(), i, j);
+                        showNearbyTiles(board[i][j]);
                         if(board[i][j].flagged) {board[i][j].flagged = false;}
                     }
                 }
@@ -478,6 +497,7 @@ void drawPlayZone(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<
 
     if(winner){
         cout << winnerTime << endl;
+        //writeHighScores(winnerTime);
     }
 
 }
@@ -525,23 +545,6 @@ vector<genericButton> createButtonsVector(){
     buttons.push_back(leaderboardButton);
 
     return buttons;
-}
-
-// Shows all nearby tiles when its clicked
-void showNearByTiles(vector<vector<Cell>>& board, int numRow, int numCol, int& click_x, int& click_y){
-    for(int x = max(click_x-1, 0); x <= min(click_x+1, numRow-1) ; x++){
-        for(int y = max(click_y-1, 0); y <= min(click_y+1, numCol-1) ; y++){
-            if(board[x][y].value == 0 && !board[x][y].revealed){
-                board[x][y].revealed = true;
-                board[x][y].imagePath = chooseImage(board[x][y].value);
-                showNearByTiles(board, numRow, numCol, x, y);
-            }
-            else if(board[x][y].value >= 1 && board[x][y].value <= 8 && !board[x][y].revealed){
-                board[x][y].revealed = true;
-                board[x][y].imagePath = chooseImage(board[x][y].value);
-            }
-        }
-    }
 }
 
 // Show all the mines on the board
@@ -731,12 +734,17 @@ void makeTime(sf::RenderWindow& window, vector<vector<Cell>>& board){
     if(paused || leaderboardClicked){
         drawClock(window, board, stoppedTime);
     }
-    if(gameOver || winner){
+    if(gameOver){
         clockNew.restart();
-        if(!winnerTimeObtained){
-            winnerTime = time;
-            winnerTimeObtained = true;
-        }
+    }
+
+    if(winner && !winnerTimeObtained){
+        sf::Time elapsed = clockNew.getElapsedTime();
+        time = to_string(elapsed.asSeconds());
+        string t = secondsToMinutes(time);
+        winnerTime = t;
+        winnerTimeObtained = true;
+        clockNew.restart();
     }
 }
 
@@ -838,4 +846,60 @@ void drawLeaderboardStuff(sf::RenderWindow& leaderboardWindow, vector<vector<Cel
     tittle.setStyle(sf::Text::Bold | sf::Text::Underlined);
 
     leaderboardWindow.draw(tittle);
+}
+
+vector<string> readHighScores(){
+    string fileName = "Files/leaderboard.txt";
+    ifstream winnerFile(fileName);
+    string value;
+    vector<string> values;
+
+    if (winnerFile.is_open()) {
+        do {
+            winnerFile >> value;
+            values.push_back(value);
+        } while (!winnerFile.fail());
+    }
+    return values;
+}
+
+void writeHighScores(string newScore) {
+    string fileName = "Files/leaderboard.txt";
+    ofstream winnerFile(fileName);
+
+    vector<string> scores;
+    scores = readHighScores();
+
+    cout << newScore << endl;
+
+    for(int i = 0 ; i < scores.size() ; i++){
+
+        if(stoi(newScore.substr(0, 2)) > stoi(scores[i].substr(0,2))){
+            scores[i] = newScore;
+        }
+        else if(stoi(newScore.substr(0, 2)) == stoi(scores[i].substr(0,2))){
+            if(stoi(newScore.substr(2, 2)) > stoi(scores[i].substr(2,2))){
+                scores[i] = newScore;
+            }
+        }
+    }
+
+    if (winnerFile.is_open()) {
+        for (const auto& value : scores) {
+            winnerFile << value << " ";
+        }
+        winnerFile.close();
+    }
+}
+
+void showNearbyTiles(Cell& cell) {
+    for(Cell* surrounding : cell.surroundingCells) {
+        if(surrounding->value == 0 && !surrounding->revealed) {
+            surrounding->revealed=true;
+            showNearbyTiles(*surrounding);
+        }
+        else if(!surrounding->revealed) {
+            surrounding->revealed=true;
+        }
+    }
 }
