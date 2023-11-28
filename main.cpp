@@ -8,6 +8,7 @@
 #include <sstream>
 #include "Cell.h"
 #include "genericButton.h"
+
 using namespace std;
 
 void setText(sf::Text &text, float x, float y);
@@ -18,7 +19,7 @@ void drawFace(sf::RenderWindow& window, vector<vector<Cell>>& board);
 void drawDebugButton(sf::RenderWindow& window, vector<genericButton>& buttons, vector<vector<Cell>>& board);
 void drawPauseButton(sf::RenderWindow& window, vector<genericButton>& buttons, vector<vector<Cell>>& board, vector<vector<bool>>& states);
 void drawLeaderboardButton(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<genericButton>& buttons, vector<vector<bool>>& states);
-void drawPlayZone(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<genericButton>& buttons);
+void drawPlayZone(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<genericButton>& buttons, vector<vector<bool>>& states);
 string chooseImage(int value);
 vector<genericButton> createButtonsVector();
 void revealAllMines(vector<vector<Cell>>& board);
@@ -43,9 +44,14 @@ void hideAllTiles(vector<vector<Cell>>& board);
 void returnValueBoard(vector<vector<Cell>>& board, vector<vector<bool>>& states);
 vector<vector<bool>> initializeStatesBoard(int& row, int& col);
 void drawLeaderboardStuff(sf::RenderWindow& leaderboardWindow, vector<vector<Cell>>& board);
-vector<string> readHighScores();
-void writeHighScores(string newScore);
 void showNearbyTiles(Cell& cell);
+void drawLeaderboard(vector<vector<Cell>>& board, vector<vector<bool>>& states);
+void toggleLeaderboardState(genericButton& button);
+vector<string> split(const string& s, char delim);
+void readAllScores(vector<string>& scores);
+void isNewHighScore(vector<string>& scores);
+void writeLeaderboard(vector<string>& scores);
+void checkScores(vector<string>& scores);
 
 // Global variables, needed to avoid clock, or states in the game update each frame
 sf::Clock clockNew;
@@ -57,7 +63,10 @@ bool gameOver = false;
 bool winner = false;
 bool winnerTimeObtained = false;
 bool leaderboardClicked = false;
+bool winnerWrote = false;
 string winnerTime;
+string name;
+
 
 int main() {
 
@@ -96,8 +105,6 @@ int main() {
     setText(inputName, (float(width)/2) , ((float(height)/2)-40));
     inputName.setFillColor(sf::Color::Yellow);
     inputName.setStyle(sf::Text::Bold);
-
-    string name;
 
     while(window.isOpen()) {
         sf::Event event{};
@@ -254,7 +261,7 @@ void drawGame(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<gene
     drawDebugButton(window, buttons, board);
     drawPauseButton(window, buttons, board, states);
     drawLeaderboardButton(window, board, buttons, states);
-    drawPlayZone(window, board, buttons);
+    drawPlayZone(window, board, buttons, states);
 }
 
 // Draws the face Button, and controls the clicks
@@ -395,30 +402,10 @@ void drawLeaderboardButton(sf::RenderWindow& window, vector<vector<Cell>>& board
                 sf::Vector2i clickPosition = sf::Mouse::getPosition(window);
 
                 if(leaderboardRectangle.getGlobalBounds().contains(sf::Vector2f(clickPosition))) {
-                    if(!leaderboardClicked){
-                        leaderboardClicked = true;
-                        saveStateOfTiles(board, states);
-                        revealAllTiles(board);
-
-                        int height = board[1].size() * 16;
-                        int width = (board.size() * 16) + 50;
-                        sf::RenderWindow leaderboardWindow(sf::VideoMode(width, height), "Minesweeper");
-
-                        while(leaderboardWindow.isOpen()) {
-                            sf::Event event{};
-                            while(leaderboardWindow.pollEvent(event)) {
-                                if(event.type == sf::Event::Closed) {
-                                    leaderboardClicked = false;
-                                    hideAllTiles(board);
-                                    returnValueBoard(board, states);
-                                    leaderboardWindow.close();
-                                }
-                            }
-                            leaderboardWindow.clear(sf::Color::Blue);
-                            drawLeaderboardStuff(leaderboardWindow, board);
-                            leaderboardWindow.display();
-                        }
-                    }
+                    leaderboardClicked = true;
+                    saveStateOfTiles(board, states);
+                    revealAllTiles(board);
+                    toggleLeaderboardState(buttons[i]);
                 }
             }
 
@@ -430,7 +417,7 @@ void drawLeaderboardButton(sf::RenderWindow& window, vector<vector<Cell>>& board
 }
 
 // Draws the Play zone, all the tiles, numbers, mines and flags are drawn here, and controls the clicks
-void drawPlayZone(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<genericButton>& buttons){
+void drawPlayZone(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<genericButton>& buttons, vector<vector<bool>>& states){
     int flagCounter = 0;
     int mineCounter = 0;
     for (int i = 0 ; i < board.size() ; i++){
@@ -494,10 +481,19 @@ void drawPlayZone(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<
     if(!paused && !leaderboardClicked){
         winner = checkIfWinner(board);
     }
+    if(winner && !winnerWrote){
+        if(!winnerTime.empty()) {
+            vector<string> scores;
+            readAllScores(scores);
+            checkScores(scores);
+            isNewHighScore(scores);
+            writeLeaderboard(scores);
+            winnerWrote = true;
+        }
+    }
 
-    if(winner){
-        cout << winnerTime << endl;
-        //writeHighScores(winnerTime);
+    if(leaderboardClicked){
+        drawLeaderboard(board, states);
     }
 
 }
@@ -848,50 +844,6 @@ void drawLeaderboardStuff(sf::RenderWindow& leaderboardWindow, vector<vector<Cel
     leaderboardWindow.draw(tittle);
 }
 
-vector<string> readHighScores(){
-    string fileName = "Files/leaderboard.txt";
-    ifstream winnerFile(fileName);
-    string value;
-    vector<string> values;
-
-    if (winnerFile.is_open()) {
-        do {
-            winnerFile >> value;
-            values.push_back(value);
-        } while (!winnerFile.fail());
-    }
-    return values;
-}
-
-void writeHighScores(string newScore) {
-    string fileName = "Files/leaderboard.txt";
-    ofstream winnerFile(fileName);
-
-    vector<string> scores;
-    scores = readHighScores();
-
-    cout << newScore << endl;
-
-    for(int i = 0 ; i < scores.size() ; i++){
-
-        if(stoi(newScore.substr(0, 2)) > stoi(scores[i].substr(0,2))){
-            scores[i] = newScore;
-        }
-        else if(stoi(newScore.substr(0, 2)) == stoi(scores[i].substr(0,2))){
-            if(stoi(newScore.substr(2, 2)) > stoi(scores[i].substr(2,2))){
-                scores[i] = newScore;
-            }
-        }
-    }
-
-    if (winnerFile.is_open()) {
-        for (const auto& value : scores) {
-            winnerFile << value << " ";
-        }
-        winnerFile.close();
-    }
-}
-
 void showNearbyTiles(Cell& cell) {
     for(Cell* surrounding : cell.surroundingCells) {
         if(surrounding->value == 0 && !surrounding->revealed) {
@@ -900,6 +852,100 @@ void showNearbyTiles(Cell& cell) {
         }
         else if(!surrounding->revealed) {
             surrounding->revealed=true;
+        }
+    }
+}
+
+void drawLeaderboard(vector<vector<Cell>>& board, vector<vector<bool>>& states){
+    int height = board[1].size() * 16;
+    int width = (board.size() * 16) + 50;
+    sf::RenderWindow leaderboardWindow(sf::VideoMode(width, height), "Minesweeper");
+
+    while(leaderboardWindow.isOpen()) {
+        sf::Event event{};
+        while(leaderboardWindow.pollEvent(event)) {
+            if(event.type == sf::Event::Closed) {
+                leaderboardClicked = false;
+                hideAllTiles(board);
+                returnValueBoard(board, states);
+                leaderboardWindow.close();
+            }
+        }
+        leaderboardWindow.clear(sf::Color::Blue);
+        drawLeaderboardStuff(leaderboardWindow, board);
+        leaderboardWindow.display();
+    }
+}
+
+void toggleLeaderboardState(genericButton& button) {
+    button.clicked = !button.clicked;
+}
+
+void readAllScores(vector<string>& scores){
+    ifstream file("Files/leaderboard.txt");
+    string line;
+    while(getline(file, line)) {
+        vector<string> parts = split(line, ',');
+        string time = parts[0];
+        string nameNew = parts[1];
+        string data = time + "," + nameNew;
+        scores.push_back(data);
+    }
+
+    sort(scores.begin(), scores.end());
+    if(scores.size() > 5) {
+        scores.erase(scores.begin()+5, scores.end());
+    }
+    else{
+        if(scores.size() < 5){
+            for (int i = scores.size(); i <=5; i++) {
+                scores.push_back("59:59,----------");
+            }
+        }
+    }
+}
+
+vector<string> split(const string& s, char delim) {
+    vector<string> result;
+    stringstream ss(s);
+    string token;
+
+    while (getline(ss, token, delim)) {
+        result.push_back(token);
+    }
+    return result;
+}
+
+void isNewHighScore( vector<string>& scores){
+    for(int i = 0; i < scores.size() ; i++) {
+        if(stoi(winnerTime.substr(0,2)) < stoi(scores[i].substr(0,2))) {
+            scores.insert(scores.begin() + i, winnerTime.substr(0,2) + ":" + winnerTime.substr(2,2) + "," + name);
+            break;
+        }
+        else if(stoi(winnerTime.substr(0,2)) == stoi(scores[i].substr(0,2))) {
+            if(stoi(winnerTime.substr(3,2)) < stoi(scores[i].substr(3,2))) {
+                scores.insert(scores.begin() + i, winnerTime.substr(0,2) + ":" + winnerTime.substr(2,2) + "," + name);
+                break;
+            }
+        }
+    }
+}
+
+void writeLeaderboard(vector<string>& scores){
+    if(scores.size() > 5) {
+        scores.erase(scores.begin()+5, scores.end());
+    }
+    ofstream file("Files/leaderboard.txt");
+    for(auto& score : scores) {
+        cout << score << endl;
+        file << score << endl;
+    }
+}
+
+void checkScores(vector<string>& scores){
+    if(scores.size() < 5){
+        for (int i = scores.size(); i <=5; i++) {
+            scores.push_back("59:59,----------");
         }
     }
 }

@@ -7,7 +7,8 @@ add_executable(minesweeper main.cpp
         Cell.cpp
         Cell.h
         genericButton.cpp
-        genericButton.h)
+        genericButton.h
+)
 
 set(SFML_STATIC_LIBRARIES TRUE)
 set(SFML_DIR C:/SFML/lib/cmake/SFML)
