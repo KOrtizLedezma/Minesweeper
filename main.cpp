@@ -85,10 +85,9 @@ int main() {
 
     vector<vector<Cell>> board = createBoard(colCount, rowCount, minesCount);
     vector<vector<bool>> states = initializeStatesBoard(rowCount, colCount);
-    //printBoard(board, rowCount, colCount);
 
     sf::RenderWindow window(sf::VideoMode(width, height), "Minesweeper");
-    window.setFramerateLimit(10);
+    //window.setFramerateLimit(10);
     sf::Font font;
     font.loadFromFile("Font/font.ttf");
 
