@@ -15,7 +15,7 @@ void setText(sf::Text &text, float x, float y);
 void readConfigFile(int& numCol, int& numRow, int& numMines);
 vector<vector<Cell>> createBoard(int& numCol, int& numRow, int& numMines);
 void drawGame(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<genericButton>& buttons, vector<vector<bool>>& states);
-void drawFace(sf::RenderWindow& window, vector<vector<Cell>>& board);
+void drawFace(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<genericButton>& buttons);
 void drawDebugButton(sf::RenderWindow& window, vector<genericButton>& buttons, vector<vector<Cell>>& board);
 void drawPauseButton(sf::RenderWindow& window, vector<genericButton>& buttons, vector<vector<Cell>>& board, vector<vector<bool>>& states);
 void drawLeaderboardButton(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<genericButton>& buttons, vector<vector<bool>>& states);
@@ -37,7 +37,7 @@ void makeTime(sf::RenderWindow& window, vector<vector<Cell>>& board);
 void togglePause();
 bool checkIfWinner(vector<vector<Cell>>& board);
 int getMinesValue(vector<vector<Cell>>& board);
-void restartGame(vector<vector<Cell>>& board);
+void restartGame(vector<vector<Cell>>& board, vector<genericButton>& buttons);
 void saveStateOfTiles(vector<vector<Cell>>& board, vector<vector<bool>>& states);
 void revealAllTiles(vector<vector<Cell>>& board);
 void hideAllTiles(vector<vector<Cell>>& board);
@@ -52,6 +52,7 @@ void readAllScores(vector<string>& scores);
 void isNewHighScore(vector<string>& scores);
 void writeLeaderboard(vector<string>& scores);
 void checkScores(vector<string>& scores);
+string getScores();
 
 // Global variables, needed to avoid clock, or states in the game update each frame
 sf::Clock clockNew;
@@ -66,7 +67,6 @@ bool leaderboardClicked = false;
 bool winnerWrote = false;
 string winnerTime;
 string name;
-
 
 int main() {
 
@@ -88,6 +88,7 @@ int main() {
     //printBoard(board, rowCount, colCount);
 
     sf::RenderWindow window(sf::VideoMode(width, height), "Minesweeper");
+    window.setFramerateLimit(10);
     sf::Font font;
     font.loadFromFile("Font/font.ttf");
 
@@ -257,7 +258,7 @@ vector<vector<Cell>> createBoard(int& numCol, int& numRow, int& numMines){
 
 // Calls all the method needed to draw the game
 void drawGame(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<genericButton>& buttons, vector<vector<bool>>& states){
-    drawFace(window, board);
+    drawFace(window, board, buttons);
     drawDebugButton(window, buttons, board);
     drawPauseButton(window, buttons, board, states);
     drawLeaderboardButton(window, board, buttons, states);
@@ -265,7 +266,7 @@ void drawGame(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<gene
 }
 
 // Draws the face Button, and controls the clicks
-void drawFace(sf::RenderWindow& window, vector<vector<Cell>>& board){
+void drawFace(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<genericButton>& buttons){
     float x = ((float(board[1].size())/2.f) * 32) - 32;
     float y = 32 * (float(board.size()) + 0.5f);
     sf::Texture faceTexture;
@@ -294,7 +295,7 @@ void drawFace(sf::RenderWindow& window, vector<vector<Cell>>& board){
     if(sf::Mouse::isButtonPressed(sf::Mouse::Left)){
         sf::Vector2i clickPosition = sf::Mouse::getPosition(window);
         if(faceRectangle.getGlobalBounds().contains(sf::Vector2f(clickPosition))){
-            restartGame(board);
+            restartGame(board, buttons);
         }
     }
 }
@@ -429,7 +430,7 @@ void drawPlayZone(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<
 
             drawTile(window, board[i][j]);
 
-            if(sf::Mouse::isButtonPressed(sf::Mouse::Left) && !paused && !gameOver && !buttons[2].clicked && !winner && !leaderboardClicked){
+            if(sf::Mouse::isButtonPressed(sf::Mouse::Left) && !paused && !gameOver && !winner && !leaderboardClicked){
                 sf::Vector2i clickPosition = sf::Mouse::getPosition(window);
                 if(tileRectangle.getGlobalBounds().contains(sf::Vector2f(clickPosition))){
                     if(board[i][j].value == 9 && !paused){
@@ -448,7 +449,7 @@ void drawPlayZone(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<
                     }
                 }
             }
-            if(sf::Mouse::isButtonPressed(sf::Mouse::Right) && !paused && !gameOver && !buttons[2].clicked && !winner && !leaderboardClicked){
+            if(sf::Mouse::isButtonPressed(sf::Mouse::Right) && !paused && !gameOver && !winner && !leaderboardClicked){
                 sf::Vector2i clickPosition = sf::Mouse::getPosition(window);
                 if(tileRectangle.getGlobalBounds().contains(sf::Vector2f(clickPosition))){
                     if(!board[i][j].revealed){
@@ -489,6 +490,8 @@ void drawPlayZone(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<
             isNewHighScore(scores);
             writeLeaderboard(scores);
             winnerWrote = true;
+            drawLeaderboard(board, states);
+            restartGame(board, buttons);
         }
     }
 
@@ -760,7 +763,7 @@ bool checkIfWinner(vector<vector<Cell>>& board){
     return trueWinner;
 }
 
-void restartGame(vector<vector<Cell>>& board){
+void restartGame(vector<vector<Cell>>& board, vector<genericButton>& buttons){
     int col = board[1].size();
     int row = board.size();
     int mines = getMinesValue(board);
@@ -770,6 +773,8 @@ void restartGame(vector<vector<Cell>>& board){
     paused = false;
     started = false;
     winnerTimeObtained = false;
+    winnerWrote = false;
+    buttons[2].clicked = false;
 }
 
 int getMinesValue(vector<vector<Cell>>& board){
@@ -830,8 +835,8 @@ vector<vector<bool>> initializeStatesBoard(int& row, int& col){
 
 void drawLeaderboardStuff(sf::RenderWindow& leaderboardWindow, vector<vector<Cell>>& board){
 
-    int height = board[1].size() * 16;
-    int width = (board.size() * 16) + 50;
+    int width = board[1].size() * 16;
+    int height = (board.size() * 16) + 50;
 
     sf::Font font;
     font.loadFromFile("Font/font.ttf");
@@ -842,6 +847,15 @@ void drawLeaderboardStuff(sf::RenderWindow& leaderboardWindow, vector<vector<Cel
     tittle.setStyle(sf::Text::Bold | sf::Text::Underlined);
 
     leaderboardWindow.draw(tittle);
+
+    string leaderboard = getScores();
+
+    sf::Text Message(leaderboard, font, 20);
+    setText(Message, (float(width)/2) , ((float(height)/2)+20));
+    Message.setFillColor(sf::Color::White);
+    Message.setStyle(sf::Text::Bold);
+
+    leaderboardWindow.draw(Message);
 }
 
 void showNearbyTiles(Cell& cell) {
@@ -857,8 +871,8 @@ void showNearbyTiles(Cell& cell) {
 }
 
 void drawLeaderboard(vector<vector<Cell>>& board, vector<vector<bool>>& states){
-    int height = board[1].size() * 16;
-    int width = (board.size() * 16) + 50;
+    int width = board[1].size() * 16;
+    int height = (board.size() * 16) + 50;
     sf::RenderWindow leaderboardWindow(sf::VideoMode(width, height), "Minesweeper");
 
     while(leaderboardWindow.isOpen()) {
@@ -937,7 +951,6 @@ void writeLeaderboard(vector<string>& scores){
     }
     ofstream file("Files/leaderboard.txt");
     for(auto& score : scores) {
-        cout << score << endl;
         file << score << endl;
     }
 }
@@ -945,7 +958,49 @@ void writeLeaderboard(vector<string>& scores){
 void checkScores(vector<string>& scores){
     if(scores.size() < 5){
         for (int i = scores.size(); i <=5; i++) {
-            scores.push_back("59:59,----------");
+            scores.push_back("  59:59,----------");
         }
     }
+}
+
+string getScores(){
+
+    vector<string> scores;
+    readAllScores(scores);
+
+    string firstPlace, secondPlace, thirdPlace, fourthPlace, fifthPlace;
+    if(name == scores[0].substr(6) && winnerTime == scores[0].substr(0,2)+scores[0].substr(3,2)){
+        firstPlace = "1.\t"+scores[0].substr(0,5)+"\t"+scores[0].substr(6)+"*";
+    }
+    else{
+        firstPlace = "1.\t"+scores[0].substr(0,5)+"\t"+scores[0].substr(6);
+    }
+
+    if(name == scores[1].substr(6) && winnerTime == scores[1].substr(0,2)+scores[1].substr(3,2)){
+        secondPlace = "2.\t"+scores[1].substr(0,5)+"\t"+scores[1].substr(6)+"*";
+    }
+    else{
+        secondPlace = "2.\t"+scores[1].substr(0,5)+"\t"+scores[1].substr(6);
+    }
+    if(name == scores[2].substr(6) && winnerTime == scores[2].substr(0,2)+scores[2].substr(3,2)){
+        thirdPlace = "3.\t"+scores[2].substr(0,5)+"\t"+scores[2].substr(6)+"*";
+    }
+    else{
+        thirdPlace = "3.\t"+scores[2].substr(0,5)+"\t"+scores[2].substr(6);
+    }
+    if(name == scores[3].substr(6) && winnerTime == scores[3].substr(0,2)+scores[3].substr(3,2)){
+        fourthPlace = "4.\t"+scores[3].substr(0,5)+"\t"+scores[3].substr(6)+"*";
+    }
+    else{
+        fourthPlace = "4.\t"+scores[3].substr(0,5)+"\t"+scores[3].substr(6);
+    }
+    if(name == scores[4].substr(6) && winnerTime == scores[4].substr(0,2)+scores[4].substr(3,2)){
+        fifthPlace = "5.\t"+scores[4].substr(0,5)+"\t"+scores[4].substr(6);
+    }
+    else{
+        fifthPlace = "5.\t"+scores[4].substr(0,5)+"\t"+scores[4].substr(6);
+    }
+    string leaderboard = firstPlace + "\n" + secondPlace + "\n" + thirdPlace + "\n" + fourthPlace + "\n" + fifthPlace;
+
+    return leaderboard;
 }
