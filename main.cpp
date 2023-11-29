@@ -84,7 +84,7 @@ int main() {
     vector<vector<bool>> states = initializeStatesBoard(rowCount, colCount);
 
     sf::RenderWindow window(sf::VideoMode(width, height), "Minesweeper");
-    //window.setFramerateLimit(10);
+    window.setFramerateLimit(10);
     sf::Font font;
     font.loadFromFile("Font/font.ttf");
 
@@ -395,7 +395,7 @@ void drawLeaderboardButton(sf::RenderWindow& window, vector<vector<Cell>>& board
             leaderboardSprite.setTextureRect(sf::IntRect(0, 0, 64, 64));
             leaderboardSprite.setPosition(x, y);
 
-            if(sf::Mouse::isButtonPressed(sf::Mouse::Left) && (manager.gameOver || !manager.winner)){
+            if(sf::Mouse::isButtonPressed(sf::Mouse::Left) && ((manager.gameOver || !manager.winner) || (!manager.gameOver || manager.winner))) {
                 sf::Vector2i clickPosition = sf::Mouse::getPosition(window);
 
                 if(leaderboardRectangle.getGlobalBounds().contains(sf::Vector2f(clickPosition))) {
@@ -431,7 +431,7 @@ void drawPlayZone(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<
 
             if(sf::Mouse::isButtonPressed(sf::Mouse::Left) && !manager.paused && !manager.gameOver && !manager.winner && !manager.leaderboardClicked){
                 sf::Vector2i clickPosition = sf::Mouse::getPosition(window);
-                if(tileRectangle.getGlobalBounds().contains(sf::Vector2f(clickPosition))){
+                if(tileRectangle.getGlobalBounds().contains(sf::Vector2f(clickPosition)) && !board[i][j].flagged){
                     if(board[i][j].value == 9 && !manager.paused){
                         manager.gameOver = true;
                         revealAllMines(board);
@@ -442,7 +442,6 @@ void drawPlayZone(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<
                     }
                     else{
                         board[i][j].revealed = true;
-                        //showNearByTiles(board, board.size(), board[i].size(), i, j);
                         showNearbyTiles(board[i][j]);
                         if(board[i][j].flagged) {board[i][j].flagged = false;}
                     }
@@ -489,9 +488,10 @@ void drawPlayZone(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<
             writeLeaderboard(scores);
             flagAllMines(board);
             manager.winnerWrote = true;
-            thread leaderboardThread(drawLeaderboard, ref(board), ref(states), ref(buttons), ref(manager));
-            leaderboardThread.detach();
-            manager.leaderboardOpen = true;
+            buttons[2].clicked = false;
+//            thread leaderboardThread(drawLeaderboard, ref(board), ref(states), ref(buttons), ref(manager));
+//            leaderboardThread.detach();
+//            manager.leaderboardOpen = true;
         }
     }
 
@@ -719,22 +719,21 @@ void makeTime(sf::RenderWindow& window, vector<vector<Cell>>& board, gameManager
 
     sf::Time elapsedTotal;
     sf::Time pauseTotal;
-    string stopped;
 
     if (!manager.started && !manager.paused) {
         clockNew.restart();  // Start the clock
         manager.started = true;
     }
 
-    if (!manager.paused && !manager.leaderboardOpen) {
+    if (!manager.paused && !manager.leaderboardOpen && !manager.winner) {
         elapsedTotal = clockNew.getElapsedTime();
         string t = secondsToMinutes(to_string(reducePausedTime(elapsedTotal, pauseTotal)));
-        stopped = t;
+        manager.stopped = t;
         drawClock(window, board, t);
     }
-    if(manager.paused || manager.leaderboardOpen){
+    if(manager.paused || manager.leaderboardOpen || manager.winner){
         pauseTotal = clockNew.getElapsedTime();
-        drawClock(window, board, stopped);
+        drawClock(window, board, manager.stopped);
     }
     if(manager.gameOver){
         clockNew.restart();
@@ -886,9 +885,9 @@ void drawLeaderboard(vector<vector<Cell>>& board, vector<vector<bool>>& states, 
                 returnValueBoard(board, states);
                 manager.leaderboardOpen = false;
                 leaderboardWindow.close();
-                if(manager.winner){
-                    restartGame(board, buttons, manager);
-                }
+//                if(manager.winner){
+//                    restartGame(board, buttons, manager);
+//                }
             }
         }
         leaderboardWindow.clear(sf::Color::Blue);

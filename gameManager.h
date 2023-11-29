@@ -24,6 +24,9 @@ public:
 
     string winnerTime;
     string name;
+    string stopped;
+
+    sf::Clock clockNew;
 
     gameManager(){
         this->gameOver = false;
