@@ -6,6 +6,7 @@
 #include <iostream>
 #include <chrono>
 #include <sstream>
+#include <thread>
 #include "Cell.h"
 #include "genericButton.h"
 
@@ -45,7 +46,7 @@ void returnValueBoard(vector<vector<Cell>>& board, vector<vector<bool>>& states)
 vector<vector<bool>> initializeStatesBoard(int& row, int& col);
 void drawLeaderboardStuff(sf::RenderWindow& leaderboardWindow, vector<vector<Cell>>& board);
 void showNearbyTiles(Cell& cell);
-void drawLeaderboard(vector<vector<Cell>>& board, vector<vector<bool>>& states);
+void drawLeaderboard(vector<vector<Cell>>& board, vector<vector<bool>>& states, vector<genericButton>& buttons);
 void toggleLeaderboardState(genericButton& button);
 vector<string> split(const string& s, char delim);
 void readAllScores(vector<string>& scores);
@@ -53,6 +54,7 @@ void isNewHighScore(vector<string>& scores);
 void writeLeaderboard(vector<string>& scores);
 void checkScores(vector<string>& scores);
 string getScores();
+void flagAllMines(vector<vector<Cell>>& board);
 
 // Global variables, needed to avoid clock, or states in the game update each frame
 sf::Clock clockNew;
@@ -65,6 +67,7 @@ bool winner = false;
 bool winnerTimeObtained = false;
 bool leaderboardClicked = false;
 bool winnerWrote = false;
+bool leaderboardOpen = false;
 string winnerTime;
 string name;
 
@@ -398,10 +401,13 @@ void drawLeaderboardButton(sf::RenderWindow& window, vector<vector<Cell>>& board
             leaderboardSprite.setTextureRect(sf::IntRect(0, 0, 64, 64));
             leaderboardSprite.setPosition(x, y);
 
-            if(sf::Mouse::isButtonPressed(sf::Mouse::Left) && !gameOver && !winner){
+            if(sf::Mouse::isButtonPressed(sf::Mouse::Left) && (gameOver || !winner)){
                 sf::Vector2i clickPosition = sf::Mouse::getPosition(window);
 
                 if(leaderboardRectangle.getGlobalBounds().contains(sf::Vector2f(clickPosition))) {
+                    thread leaderboardThread(drawLeaderboard, ref(board), ref(states), ref(buttons));
+                    leaderboardThread.detach();
+                    leaderboardOpen = true;
                     leaderboardClicked = true;
                     saveStateOfTiles(board, states);
                     revealAllTiles(board);
@@ -488,16 +494,19 @@ void drawPlayZone(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<
             checkScores(scores);
             isNewHighScore(scores);
             writeLeaderboard(scores);
+            flagAllMines(board);
             winnerWrote = true;
-            drawLeaderboard(board, states);
-            restartGame(board, buttons);
+            thread leaderboardThread(drawLeaderboard, ref(board), ref(states), ref(buttons));
+            leaderboardThread.detach();
+            leaderboardOpen = true;
         }
     }
 
-    if(leaderboardClicked){
-        drawLeaderboard(board, states);
+    if(gameOver && leaderboardClicked && !leaderboardOpen){
+        thread leaderboardThread(drawLeaderboard, ref(board), ref(states), ref(buttons));
+        leaderboardThread.detach();
+        leaderboardOpen = true;
     }
-
 }
 
 // Choose the correct image path
@@ -722,14 +731,14 @@ void makeTime(sf::RenderWindow& window, vector<vector<Cell>>& board){
         started = true;
     }
 
-    if (!paused) {
+    if (!paused && !leaderboardOpen) {
         sf::Time elapsed = clockNew.getElapsedTime();
         time = to_string(elapsed.asSeconds());
         string t = secondsToMinutes(time);
         stoppedTime = t;
         drawClock(window, board, t);
     }
-    if(paused || leaderboardClicked){
+    if(paused || leaderboardOpen){
         drawClock(window, board, stoppedTime);
     }
     if(gameOver){
@@ -859,29 +868,33 @@ void drawLeaderboardStuff(sf::RenderWindow& leaderboardWindow, vector<vector<Cel
 
 void showNearbyTiles(Cell& cell) {
     for(Cell* surrounding : cell.surroundingCells) {
-        if(surrounding->value == 0 && !surrounding->revealed) {
+        if(surrounding->value == 0 && !surrounding->revealed && !surrounding->flagged) {
             surrounding->revealed=true;
             showNearbyTiles(*surrounding);
         }
-        else if(!surrounding->revealed) {
+        else if(!surrounding->revealed && !surrounding->flagged) {
             surrounding->revealed=true;
         }
     }
 }
 
-void drawLeaderboard(vector<vector<Cell>>& board, vector<vector<bool>>& states){
+void drawLeaderboard(vector<vector<Cell>>& board, vector<vector<bool>>& states, vector<genericButton>& buttons){
     int width = board[1].size() * 16;
     int height = (board.size() * 16) + 50;
     sf::RenderWindow leaderboardWindow(sf::VideoMode(width, height), "Minesweeper");
 
-    while(leaderboardWindow.isOpen()) {
+    while(leaderboardWindow.isOpen() && leaderboardOpen) {
         sf::Event event{};
         while(leaderboardWindow.pollEvent(event)) {
             if(event.type == sf::Event::Closed) {
                 leaderboardClicked = false;
                 hideAllTiles(board);
                 returnValueBoard(board, states);
+                leaderboardOpen = false;
                 leaderboardWindow.close();
+                if(winner){
+                    restartGame(board, buttons);
+                }
             }
         }
         leaderboardWindow.clear(sf::Color::Blue);
@@ -1002,4 +1015,14 @@ string getScores(){
     string leaderboard = firstPlace + "\n" + secondPlace + "\n" + thirdPlace + "\n" + fourthPlace + "\n" + fifthPlace;
 
     return leaderboard;
+}
+
+void flagAllMines(vector<vector<Cell>>& board){
+    for(int i = 0 ; i < board.size() ; i++){
+        for(int j = 0 ; j < board[i].size() ; j++){
+            if(board[i][j].value == 9){
+                board[i][j].flagged = true;
+            }
+        }
+    }
 }
