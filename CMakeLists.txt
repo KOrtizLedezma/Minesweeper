@@ -4,10 +4,11 @@ project(minesweeper)
 set(CMAKE_CXX_STANDARD 14)
 
 add_executable(minesweeper main.cpp
-        Cell.cpp
         Cell.h
-        genericButton.cpp
         genericButton.h
+        gameManager.h
+        artist.h
+        data.h
 )
 
 set(SFML_STATIC_LIBRARIES TRUE)

@@ -9,18 +9,19 @@
 #include <thread>
 #include "Cell.h"
 #include "genericButton.h"
+#include "gameManager.h"
 
 using namespace std;
 
 void setText(sf::Text &text, float x, float y);
 void readConfigFile(int& numCol, int& numRow, int& numMines);
 vector<vector<Cell>> createBoard(int& numCol, int& numRow, int& numMines);
-void drawGame(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<genericButton>& buttons, vector<vector<bool>>& states);
-void drawFace(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<genericButton>& buttons);
-void drawDebugButton(sf::RenderWindow& window, vector<genericButton>& buttons, vector<vector<Cell>>& board);
-void drawPauseButton(sf::RenderWindow& window, vector<genericButton>& buttons, vector<vector<Cell>>& board, vector<vector<bool>>& states);
-void drawLeaderboardButton(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<genericButton>& buttons, vector<vector<bool>>& states);
-void drawPlayZone(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<genericButton>& buttons, vector<vector<bool>>& states);
+void drawGame(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<genericButton>& buttons, vector<vector<bool>>& states, gameManager& manager, sf::Clock& clockNew);
+void drawFace(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<genericButton>& buttons, gameManager& manager);
+void drawDebugButton(sf::RenderWindow& window, vector<genericButton>& buttons, vector<vector<Cell>>& board, gameManager& manager);
+void drawPauseButton(sf::RenderWindow& window, vector<genericButton>& buttons, vector<vector<Cell>>& board, vector<vector<bool>>& states, gameManager& manager);
+void drawLeaderboardButton(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<genericButton>& buttons, vector<vector<bool>>& states, gameManager& manager);
+void drawPlayZone(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<genericButton>& buttons, vector<vector<bool>>& states, gameManager& manager, sf::Clock& clockNew);
 string chooseImage(int value);
 vector<genericButton> createButtonsVector();
 void revealAllMines(vector<vector<Cell>>& board);
@@ -34,54 +35,47 @@ int chooseRightValue(const char& value);
 string validateNumber(string& number);
 void drawClock(sf::RenderWindow& window, const vector<vector<Cell>>& board, const string & value);
 string secondsToMinutes(string seconds);
-void makeTime(sf::RenderWindow& window, vector<vector<Cell>>& board);
-void togglePause();
+void makeTime(sf::RenderWindow& window, vector<vector<Cell>>& board, gameManager& manager, sf::Clock& clockNew);
+void togglePause(gameManager& manager);
 bool checkIfWinner(vector<vector<Cell>>& board);
 int getMinesValue(vector<vector<Cell>>& board);
-void restartGame(vector<vector<Cell>>& board, vector<genericButton>& buttons);
+void restartGame(vector<vector<Cell>>& board, vector<genericButton>& buttons, gameManager& manager);
 void saveStateOfTiles(vector<vector<Cell>>& board, vector<vector<bool>>& states);
 void revealAllTiles(vector<vector<Cell>>& board);
 void hideAllTiles(vector<vector<Cell>>& board);
 void returnValueBoard(vector<vector<Cell>>& board, vector<vector<bool>>& states);
 vector<vector<bool>> initializeStatesBoard(int& row, int& col);
-void drawLeaderboardStuff(sf::RenderWindow& leaderboardWindow, vector<vector<Cell>>& board);
+void drawLeaderboardStuff(sf::RenderWindow& leaderboardWindow, vector<vector<Cell>>& board, gameManager& manager);
 void showNearbyTiles(Cell& cell);
-void drawLeaderboard(vector<vector<Cell>>& board, vector<vector<bool>>& states, vector<genericButton>& buttons);
+void drawLeaderboard(vector<vector<Cell>>& board, vector<vector<bool>>& states, vector<genericButton>& buttons, gameManager& manager);
 void toggleLeaderboardState(genericButton& button);
 vector<string> split(const string& s, char delim);
 void readAllScores(vector<string>& scores);
-void isNewHighScore(vector<string>& scores);
+void isNewHighScore( vector<string>& scores, gameManager& manager);
 void writeLeaderboard(vector<string>& scores);
 void checkScores(vector<string>& scores);
-string getScores();
+string getScores(gameManager& manager);
 void flagAllMines(vector<vector<Cell>>& board);
 
-// Global variables, needed to avoid clock, or states in the game update each frame
-sf::Clock clockNew;
-string stoppedTime;
+int reducePausedTime(sf::Time total, sf::Time totalP);
 
-bool started = false;
-bool paused = false;
-bool gameOver = false;
-bool winner = false;
-bool winnerTimeObtained = false;
-bool leaderboardClicked = false;
-bool winnerWrote = false;
-bool leaderboardOpen = false;
-string winnerTime;
-string name;
+
 
 int main() {
 
-    enum State { Welcome, Game };
+    enum State { Welcome, Game};
     State currentState = Welcome;
 
     int rowCount = 0;
     int colCount = 0;
     int minesCount = 0;
 
+    gameManager manager = gameManager();
+
     readConfigFile(colCount, rowCount, minesCount);
     vector<genericButton> buttons = createButtonsVector();
+
+    sf::Clock clockNew;
 
     const int width = (colCount * 32);
     const int height = (rowCount * 32) + 100;
@@ -117,26 +111,26 @@ int main() {
             }
             else if(event.type == sf::Event::TextEntered){
                 if(event.text.unicode == 13){
-                    if(!name.empty()){
+                    if(!manager.name.empty()){
                         currentState = Game;
                     }
                 }
                 else if(event.text.unicode == 8){
-                    if(!name.empty()){
-                        name.pop_back();
+                    if(!manager.name.empty()){
+                        manager.name.pop_back();
                     }
                     sf::FloatRect textRect = inputName.getLocalBounds();
                     inputName.setOrigin(textRect.left + textRect.width/2.0f,textRect.top + textRect.height/2.0f);
                 }
                 else if(isalpha(event.text.unicode)){
-                    if(name.empty()){
+                    if(manager.name.empty()){
                         char  c = static_cast<char>(toupper(event.text.unicode));
-                        name += c;
+                        manager.name += c;
                     }
                     else{
-                        if(name.length() < 10){
+                        if(manager.name.length() < 10){
                             char  c = static_cast<char>(tolower(event.text.unicode));
-                            name += c;
+                            manager.name += c;
                         }
                     }
                     sf::FloatRect textRect = inputName.getLocalBounds();
@@ -154,10 +148,10 @@ int main() {
                 break;
             case Game:
                 window.clear(sf::Color::White);
-                drawGame(window, board, buttons, states);
+                drawGame(window, board, buttons, states, manager, clockNew);
                 break;
         }
-        inputName.setString(name + "|");
+        inputName.setString(manager.name + "|");
 
         window.display();
     }
@@ -259,23 +253,23 @@ vector<vector<Cell>> createBoard(int& numCol, int& numRow, int& numMines){
 }
 
 // Calls all the method needed to draw the game
-void drawGame(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<genericButton>& buttons, vector<vector<bool>>& states){
-    drawFace(window, board, buttons);
-    drawDebugButton(window, buttons, board);
-    drawPauseButton(window, buttons, board, states);
-    drawLeaderboardButton(window, board, buttons, states);
-    drawPlayZone(window, board, buttons, states);
+void drawGame(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<genericButton>& buttons, vector<vector<bool>>& states, gameManager& manager, sf::Clock& clockNew){
+    drawFace(window, board, buttons, manager);
+    drawDebugButton(window, buttons, board, manager);
+    drawPauseButton(window, buttons, board, states, manager);
+    drawLeaderboardButton(window, board, buttons, states, manager);
+    drawPlayZone(window, board, buttons, states, manager, clockNew);
 }
 
 // Draws the face Button, and controls the clicks
-void drawFace(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<genericButton>& buttons){
+void drawFace(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<genericButton>& buttons, gameManager& manager){
     float x = ((float(board[1].size())/2.f) * 32) - 32;
     float y = 32 * (float(board.size()) + 0.5f);
     sf::Texture faceTexture;
-    if(gameOver){
+    if(manager.gameOver){
         faceTexture.loadFromFile("Images/face_lose.png");
     }
-    else if(winner){
+    else if(manager.winner){
         faceTexture.loadFromFile("Images/face_win.png");
     }
     else{
@@ -297,13 +291,13 @@ void drawFace(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<gene
     if(sf::Mouse::isButtonPressed(sf::Mouse::Left)){
         sf::Vector2i clickPosition = sf::Mouse::getPosition(window);
         if(faceRectangle.getGlobalBounds().contains(sf::Vector2f(clickPosition))){
-            restartGame(board, buttons);
+            restartGame(board, buttons, manager);
         }
     }
 }
 
 // Draws the Debug Button, and controls the clicks
-void drawDebugButton(sf::RenderWindow& window, vector<genericButton>& buttons, vector<vector<Cell>>& board){
+void drawDebugButton(sf::RenderWindow& window, vector<genericButton>& buttons, vector<vector<Cell>>& board, gameManager& manager){
     float x = ((float(board[1].size())) * 32) - 304;
     float y = 32 * (float(board.size()) + 0.5f);
 
@@ -320,7 +314,7 @@ void drawDebugButton(sf::RenderWindow& window, vector<genericButton>& buttons, v
             mineSprite.setTextureRect(sf::IntRect(0, 0, 64, 64));
             mineSprite.setPosition(x, y);
 
-            if(sf::Mouse::isButtonPressed(sf::Mouse::Left) && !gameOver && !winner){
+            if(sf::Mouse::isButtonPressed(sf::Mouse::Left) && !manager.gameOver && !manager.winner){
                 sf::Vector2i clickPosition = sf::Mouse::getPosition(window);
                 if(mineRectangle.getGlobalBounds().contains(sf::Vector2f(clickPosition))){
                     if(!buttons[i].clicked){
@@ -342,7 +336,7 @@ void drawDebugButton(sf::RenderWindow& window, vector<genericButton>& buttons, v
 }
 
 // Draws the pause Button, and controls the clicks
-void drawPauseButton(sf::RenderWindow& window, vector<genericButton>& buttons, vector<vector<Cell>>& board, vector<vector<bool>>& states){
+void drawPauseButton(sf::RenderWindow& window, vector<genericButton>& buttons, vector<vector<Cell>>& board, vector<vector<bool>>& states, gameManager& manager){
     float x = ((float(board[1].size())) * 32) - 240;
     float y = 32 * (float(board.size()) + 0.5f);
 
@@ -359,20 +353,20 @@ void drawPauseButton(sf::RenderWindow& window, vector<genericButton>& buttons, v
             pauseSprite.setTextureRect(sf::IntRect(0, 0, 64, 64));
             pauseSprite.setPosition(x, y);
 
-            if(sf::Mouse::isButtonPressed(sf::Mouse::Left) && !gameOver && !winner){
+            if(sf::Mouse::isButtonPressed(sf::Mouse::Left) && !manager.gameOver && !manager.winner){
                 sf::Vector2i clickPosition = sf::Mouse::getPosition(window);
                 if(pauseRectangle.getGlobalBounds().contains(sf::Vector2f(clickPosition))){
                     if(buttons[i].imagePath == "Images/play.png"){
                         hideAllTiles(board);
                         returnValueBoard(board, states);
                         buttons[i].imagePath = "Images/pause.png";
-                        togglePause();
+                        togglePause(manager);
                     }
                     else if(buttons[i].imagePath == "Images/pause.png"){
                         saveStateOfTiles(board, states);
                         revealAllTiles(board);
                         buttons[i].imagePath = "Images/play.png";
-                        togglePause();
+                        togglePause(manager);
                     }
                 }
             }
@@ -384,7 +378,7 @@ void drawPauseButton(sf::RenderWindow& window, vector<genericButton>& buttons, v
 }
 
 // Draws the Leaderboard Button, and controls the clicks
-void drawLeaderboardButton(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<genericButton>& buttons, vector<vector<bool>>& states){
+void drawLeaderboardButton(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<genericButton>& buttons, vector<vector<bool>>& states, gameManager& manager){
     float x = ((float(board[1].size())) * 32) - 176;
     float y = 32 * (float(board.size()) + 0.5f);
 
@@ -401,14 +395,14 @@ void drawLeaderboardButton(sf::RenderWindow& window, vector<vector<Cell>>& board
             leaderboardSprite.setTextureRect(sf::IntRect(0, 0, 64, 64));
             leaderboardSprite.setPosition(x, y);
 
-            if(sf::Mouse::isButtonPressed(sf::Mouse::Left) && (gameOver || !winner)){
+            if(sf::Mouse::isButtonPressed(sf::Mouse::Left) && (manager.gameOver || !manager.winner)){
                 sf::Vector2i clickPosition = sf::Mouse::getPosition(window);
 
                 if(leaderboardRectangle.getGlobalBounds().contains(sf::Vector2f(clickPosition))) {
-                    thread leaderboardThread(drawLeaderboard, ref(board), ref(states), ref(buttons));
+                    thread leaderboardThread(drawLeaderboard, ref(board), ref(states), ref(buttons), ref(manager));
                     leaderboardThread.detach();
-                    leaderboardOpen = true;
-                    leaderboardClicked = true;
+                    manager.leaderboardOpen = true;
+                    manager.leaderboardClicked = true;
                     saveStateOfTiles(board, states);
                     revealAllTiles(board);
                     toggleLeaderboardState(buttons[i]);
@@ -423,7 +417,7 @@ void drawLeaderboardButton(sf::RenderWindow& window, vector<vector<Cell>>& board
 }
 
 // Draws the Play zone, all the tiles, numbers, mines and flags are drawn here, and controls the clicks
-void drawPlayZone(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<genericButton>& buttons, vector<vector<bool>>& states){
+void drawPlayZone(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<genericButton>& buttons, vector<vector<bool>>& states, gameManager& manager, sf::Clock& clockNew){
     int flagCounter = 0;
     int mineCounter = 0;
     for (int i = 0 ; i < board.size() ; i++){
@@ -435,11 +429,11 @@ void drawPlayZone(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<
 
             drawTile(window, board[i][j]);
 
-            if(sf::Mouse::isButtonPressed(sf::Mouse::Left) && !paused && !gameOver && !winner && !leaderboardClicked){
+            if(sf::Mouse::isButtonPressed(sf::Mouse::Left) && !manager.paused && !manager.gameOver && !manager.winner && !manager.leaderboardClicked){
                 sf::Vector2i clickPosition = sf::Mouse::getPosition(window);
                 if(tileRectangle.getGlobalBounds().contains(sf::Vector2f(clickPosition))){
-                    if(board[i][j].value == 9 && !paused){
-                        gameOver = true;
+                    if(board[i][j].value == 9 && !manager.paused){
+                        manager.gameOver = true;
                         revealAllMines(board);
                         if(board[i][j].flagged) {board[i][j].flagged = false;}
                     }
@@ -454,7 +448,7 @@ void drawPlayZone(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<
                     }
                 }
             }
-            if(sf::Mouse::isButtonPressed(sf::Mouse::Right) && !paused && !gameOver && !winner && !leaderboardClicked){
+            if(sf::Mouse::isButtonPressed(sf::Mouse::Right) && !manager.paused && !manager.gameOver && !manager.winner && !manager.leaderboardClicked){
                 sf::Vector2i clickPosition = sf::Mouse::getPosition(window);
                 if(tileRectangle.getGlobalBounds().contains(sf::Vector2f(clickPosition))){
                     if(!board[i][j].revealed){
@@ -462,50 +456,49 @@ void drawPlayZone(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<
                     }
                 }
             }
-            if(board[i][j].revealed && !paused && !leaderboardClicked){
+            if(board[i][j].revealed && !manager.paused && !manager.leaderboardClicked){
                 board[i][j].imagePath = "Images/tile_revealed.png";
                 drawNumber(window, board[i][j]);
             }
-            if(board[i][j].flagged && !board[i][j].revealed && !paused && !leaderboardClicked){
+            if(board[i][j].flagged && !board[i][j].revealed && !manager.paused && !manager.leaderboardClicked){
                 drawFlag(window, board[i][j]);
             }
 
-            if(board[i][j].itsMine && buttons[2].clicked && !paused && !leaderboardClicked){
+            if(board[i][j].itsMine && buttons[2].clicked && !manager.paused && !manager.leaderboardClicked){
                 drawMine(window, board[i][j]);
             }
-            //drawCounter(window, minesCount, board);
         }
     }
 
 
-    makeTime(window, board);
+    makeTime(window, board, manager, clockNew);
 
     string counter = to_string(mineCounter - flagCounter);
     counter = validateNumber(counter);
     drawCounter(window, board, counter);
 
-    if(!paused && !leaderboardClicked){
-        winner = checkIfWinner(board);
+    if(!manager.paused && !manager.leaderboardClicked){
+        manager.winner = checkIfWinner(board);
     }
-    if(winner && !winnerWrote){
-        if(!winnerTime.empty()) {
+    if(manager.winner && !manager.winnerWrote){
+        if(!manager.winnerTime.empty()) {
             vector<string> scores;
             readAllScores(scores);
             checkScores(scores);
-            isNewHighScore(scores);
+            isNewHighScore(scores, manager);
             writeLeaderboard(scores);
             flagAllMines(board);
-            winnerWrote = true;
-            thread leaderboardThread(drawLeaderboard, ref(board), ref(states), ref(buttons));
+            manager.winnerWrote = true;
+            thread leaderboardThread(drawLeaderboard, ref(board), ref(states), ref(buttons), ref(manager));
             leaderboardThread.detach();
-            leaderboardOpen = true;
+            manager.leaderboardOpen = true;
         }
     }
 
-    if(gameOver && leaderboardClicked && !leaderboardOpen){
-        thread leaderboardThread(drawLeaderboard, ref(board), ref(states), ref(buttons));
+    if(manager.gameOver && manager.leaderboardClicked && !manager.leaderboardOpen){
+        thread leaderboardThread(drawLeaderboard, ref(board), ref(states), ref(buttons), ref(manager));
         leaderboardThread.detach();
-        leaderboardOpen = true;
+        manager.leaderboardOpen = true;
     }
 }
 
@@ -722,41 +715,47 @@ string secondsToMinutes(string seconds){
     return ss.str();
 }
 
-void makeTime(sf::RenderWindow& window, vector<vector<Cell>>& board){
+void makeTime(sf::RenderWindow& window, vector<vector<Cell>>& board, gameManager& manager, sf::Clock& clockNew){
 
-    string time;
+    sf::Time elapsedTotal;
+    sf::Time pauseTotal;
+    string stopped;
 
-    if (!started && !paused) {
+    if (!manager.started && !manager.paused) {
         clockNew.restart();  // Start the clock
-        started = true;
+        manager.started = true;
     }
 
-    if (!paused && !leaderboardOpen) {
-        sf::Time elapsed = clockNew.getElapsedTime();
-        time = to_string(elapsed.asSeconds());
-        string t = secondsToMinutes(time);
-        stoppedTime = t;
+    if (!manager.paused && !manager.leaderboardOpen) {
+        elapsedTotal = clockNew.getElapsedTime();
+        string t = secondsToMinutes(to_string(reducePausedTime(elapsedTotal, pauseTotal)));
+        stopped = t;
         drawClock(window, board, t);
     }
-    if(paused || leaderboardOpen){
-        drawClock(window, board, stoppedTime);
+    if(manager.paused || manager.leaderboardOpen){
+        pauseTotal = clockNew.getElapsedTime();
+        drawClock(window, board, stopped);
     }
-    if(gameOver){
+    if(manager.gameOver){
         clockNew.restart();
     }
 
-    if(winner && !winnerTimeObtained){
-        sf::Time elapsed = clockNew.getElapsedTime();
-        time = to_string(elapsed.asSeconds());
-        string t = secondsToMinutes(time);
-        winnerTime = t;
-        winnerTimeObtained = true;
+    if(manager.winner && !manager.winnerTimeObtained){
+        string t = secondsToMinutes(to_string(reducePausedTime(elapsedTotal, pauseTotal)));
+        manager.winnerTime = t;
+        manager.winnerTimeObtained = true;
         clockNew.restart();
     }
 }
 
-void togglePause() {
-    paused = !paused;
+int reducePausedTime(sf::Time total, sf::Time totalP) {
+    float t = total.asSeconds();
+    float tp = totalP.asSeconds();
+    return t - tp;
+}
+
+void togglePause(gameManager& manager) {
+    manager.paused = !manager.paused;
 }
 
 bool checkIfWinner(vector<vector<Cell>>& board){
@@ -771,17 +770,12 @@ bool checkIfWinner(vector<vector<Cell>>& board){
     return trueWinner;
 }
 
-void restartGame(vector<vector<Cell>>& board, vector<genericButton>& buttons){
+void restartGame(vector<vector<Cell>>& board, vector<genericButton>& buttons, gameManager& manager){
     int col = board[1].size();
     int row = board.size();
     int mines = getMinesValue(board);
     board = createBoard(col, row, mines);
-    gameOver = false;
-    winner = false;
-    paused = false;
-    started = false;
-    winnerTimeObtained = false;
-    winnerWrote = false;
+    manager.restartValues();
     buttons[2].clicked = false;
 }
 
@@ -841,7 +835,7 @@ vector<vector<bool>> initializeStatesBoard(int& row, int& col){
     return states;
 }
 
-void drawLeaderboardStuff(sf::RenderWindow& leaderboardWindow, vector<vector<Cell>>& board){
+void drawLeaderboardStuff(sf::RenderWindow& leaderboardWindow, vector<vector<Cell>>& board, gameManager& manager){
 
     int width = board[1].size() * 16;
     int height = (board.size() * 16) + 50;
@@ -856,7 +850,7 @@ void drawLeaderboardStuff(sf::RenderWindow& leaderboardWindow, vector<vector<Cel
 
     leaderboardWindow.draw(tittle);
 
-    string leaderboard = getScores();
+    string leaderboard = getScores(manager);
 
     sf::Text Message(leaderboard, font, 20);
     setText(Message, (float(width)/2) , ((float(height)/2)+20));
@@ -878,27 +872,27 @@ void showNearbyTiles(Cell& cell) {
     }
 }
 
-void drawLeaderboard(vector<vector<Cell>>& board, vector<vector<bool>>& states, vector<genericButton>& buttons){
+void drawLeaderboard(vector<vector<Cell>>& board, vector<vector<bool>>& states, vector<genericButton>& buttons, gameManager& manager){
     int width = board[1].size() * 16;
     int height = (board.size() * 16) + 50;
     sf::RenderWindow leaderboardWindow(sf::VideoMode(width, height), "Minesweeper");
 
-    while(leaderboardWindow.isOpen() && leaderboardOpen) {
+    while(leaderboardWindow.isOpen() && manager.leaderboardOpen) {
         sf::Event event{};
         while(leaderboardWindow.pollEvent(event)) {
             if(event.type == sf::Event::Closed) {
-                leaderboardClicked = false;
+                manager.leaderboardClicked = false;
                 hideAllTiles(board);
                 returnValueBoard(board, states);
-                leaderboardOpen = false;
+                manager.leaderboardOpen = false;
                 leaderboardWindow.close();
-                if(winner){
-                    restartGame(board, buttons);
+                if(manager.winner){
+                    restartGame(board, buttons, manager);
                 }
             }
         }
         leaderboardWindow.clear(sf::Color::Blue);
-        drawLeaderboardStuff(leaderboardWindow, board);
+        drawLeaderboardStuff(leaderboardWindow, board, manager);
         leaderboardWindow.display();
     }
 }
@@ -942,15 +936,15 @@ vector<string> split(const string& s, char delim) {
     return result;
 }
 
-void isNewHighScore( vector<string>& scores){
+void isNewHighScore( vector<string>& scores, gameManager& manager){
     for(int i = 0; i < scores.size() ; i++) {
-        if(stoi(winnerTime.substr(0,2)) < stoi(scores[i].substr(0,2))) {
-            scores.insert(scores.begin() + i, winnerTime.substr(0,2) + ":" + winnerTime.substr(2,2) + "," + name);
+        if(stoi(manager.winnerTime.substr(0,2)) < stoi(scores[i].substr(0,2))) {
+            scores.insert(scores.begin() + i, manager.winnerTime.substr(0,2) + ":" + manager.winnerTime.substr(2,2) + "," + manager.name);
             break;
         }
-        else if(stoi(winnerTime.substr(0,2)) == stoi(scores[i].substr(0,2))) {
-            if(stoi(winnerTime.substr(3,2)) < stoi(scores[i].substr(3,2))) {
-                scores.insert(scores.begin() + i, winnerTime.substr(0,2) + ":" + winnerTime.substr(2,2) + "," + name);
+        else if(stoi(manager.winnerTime.substr(0,2)) == stoi(scores[i].substr(0,2))) {
+            if(stoi(manager.winnerTime.substr(3,2)) < stoi(scores[i].substr(3,2))) {
+                scores.insert(scores.begin() + i, manager.winnerTime.substr(0,2) + ":" + manager.winnerTime.substr(2,2) + "," + manager.name);
                 break;
             }
         }
@@ -975,38 +969,38 @@ void checkScores(vector<string>& scores){
     }
 }
 
-string getScores(){
+string getScores(gameManager& manager){
 
     vector<string> scores;
     readAllScores(scores);
 
     string firstPlace, secondPlace, thirdPlace, fourthPlace, fifthPlace;
-    if(name == scores[0].substr(6) && winnerTime == scores[0].substr(0,2)+scores[0].substr(3,2)){
+    if(manager.name == scores[0].substr(6) && manager.winnerTime == scores[0].substr(0,2)+scores[0].substr(3,2)){
         firstPlace = "1.\t"+scores[0].substr(0,5)+"\t"+scores[0].substr(6)+"*";
     }
     else{
         firstPlace = "1.\t"+scores[0].substr(0,5)+"\t"+scores[0].substr(6);
     }
 
-    if(name == scores[1].substr(6) && winnerTime == scores[1].substr(0,2)+scores[1].substr(3,2)){
+    if(manager.name == scores[1].substr(6) && manager.winnerTime == scores[1].substr(0,2)+scores[1].substr(3,2)){
         secondPlace = "2.\t"+scores[1].substr(0,5)+"\t"+scores[1].substr(6)+"*";
     }
     else{
         secondPlace = "2.\t"+scores[1].substr(0,5)+"\t"+scores[1].substr(6);
     }
-    if(name == scores[2].substr(6) && winnerTime == scores[2].substr(0,2)+scores[2].substr(3,2)){
+    if(manager.name == scores[2].substr(6) && manager.winnerTime == scores[2].substr(0,2)+scores[2].substr(3,2)){
         thirdPlace = "3.\t"+scores[2].substr(0,5)+"\t"+scores[2].substr(6)+"*";
     }
     else{
         thirdPlace = "3.\t"+scores[2].substr(0,5)+"\t"+scores[2].substr(6);
     }
-    if(name == scores[3].substr(6) && winnerTime == scores[3].substr(0,2)+scores[3].substr(3,2)){
+    if(manager.name == scores[3].substr(6) && manager.winnerTime == scores[3].substr(0,2)+scores[3].substr(3,2)){
         fourthPlace = "4.\t"+scores[3].substr(0,5)+"\t"+scores[3].substr(6)+"*";
     }
     else{
         fourthPlace = "4.\t"+scores[3].substr(0,5)+"\t"+scores[3].substr(6);
     }
-    if(name == scores[4].substr(6) && winnerTime == scores[4].substr(0,2)+scores[4].substr(3,2)){
+    if(manager.name == scores[4].substr(6) && manager.winnerTime == scores[4].substr(0,2)+scores[4].substr(3,2)){
         fifthPlace = "5.\t"+scores[4].substr(0,5)+"\t"+scores[4].substr(6);
     }
     else{
