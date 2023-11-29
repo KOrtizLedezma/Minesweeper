@@ -21,12 +21,14 @@ public:
     bool winner;
     bool winnerTimeObtained;
     bool winnerWrote;
+    bool pauseFlag;
 
     string winnerTime;
     string name;
     string stopped;
 
     sf::Clock clockNew;
+    sf::Clock pausedClock;
 
     gameManager(){
         this->gameOver = false;
@@ -37,6 +39,7 @@ public:
         this->winner = false;
         this->winnerTimeObtained = false;
         this->winnerWrote = false;
+        this->pauseFlag = false;
     }
 
     void restartValues(){
