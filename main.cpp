@@ -484,10 +484,10 @@ void drawPlayZone(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<
             vector<string> scores;
             readAllScores(scores);
             checkScores(scores);
+            manager.winnerWrote = true;
             isNewHighScore(scores, manager);
             writeLeaderboard(scores);
             flagAllMines(board);
-            manager.winnerWrote = true;
             buttons[2].clicked = false;
 //            thread leaderboardThread(drawLeaderboard, ref(board), ref(states), ref(buttons), ref(manager));
 //            leaderboardThread.detach();
@@ -734,17 +734,18 @@ void makeTime(sf::RenderWindow& window, vector<vector<Cell>>& board, gameManager
     if(manager.paused || manager.leaderboardOpen || manager.winner){
         pauseTotal = clockNew.getElapsedTime();
         drawClock(window, board, manager.stopped);
+        manager.winnerTime = manager.stopped;
     }
     if(manager.gameOver){
         clockNew.restart();
     }
 
-    if(manager.winner && !manager.winnerTimeObtained){
-        string t = secondsToMinutes(to_string(reducePausedTime(elapsedTotal, pauseTotal)));
-        manager.winnerTime = t;
-        manager.winnerTimeObtained = true;
-        clockNew.restart();
-    }
+//    if(manager.winner && !manager.winnerTimeObtained){
+//        string t = secondsToMinutes(to_string(reducePausedTime(elapsedTotal, pauseTotal)));
+//        manager.winnerTime = t;
+//        manager.winnerTimeObtained = true;
+//        clockNew.restart();
+//    }
 }
 
 int reducePausedTime(sf::Time total, sf::Time totalP) {

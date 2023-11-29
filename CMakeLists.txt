@@ -7,8 +7,6 @@ add_executable(minesweeper main.cpp
         Cell.h
         genericButton.h
         gameManager.h
-        artist.h
-        data.h
 )
 
 set(SFML_STATIC_LIBRARIES TRUE)

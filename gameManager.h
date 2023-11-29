@@ -19,9 +19,7 @@ public:
     bool paused;
     bool started;
     bool winner;
-    bool winnerTimeObtained;
     bool winnerWrote;
-    bool pauseFlag;
 
     string winnerTime;
     string name;
@@ -37,9 +35,7 @@ public:
         this->paused = false;
         this->started = false;
         this->winner = false;
-        this->winnerTimeObtained = false;
         this->winnerWrote = false;
-        this->pauseFlag = false;
     }
 
     void restartValues(){
@@ -49,8 +45,9 @@ public:
         this->paused = false;
         this->started = false;
         this->winner = false;
-        this->winnerTimeObtained = false;
         this->winnerWrote = false;
+        this->winnerTime = "";
+        this->stopped = "";
     }
 
     void setName(const string &nameA) {
