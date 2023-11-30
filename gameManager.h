@@ -20,13 +20,23 @@ public:
     bool started;
     bool winner;
     bool winnerWrote;
+    bool pauseReset;
+    bool isPaused;
+    bool once;
+    bool limbo;
 
     string winnerTime;
     string name;
     string stopped;
+    float totalPauseTime;
+    float prevTime;
+    float totalTime;
+    float display;
 
     sf::Clock clockNew;
     sf::Clock pausedClock;
+
+    vector<float> times;
 
     gameManager(){
         this->gameOver = false;
@@ -36,6 +46,16 @@ public:
         this->started = false;
         this->winner = false;
         this->winnerWrote = false;
+        this->pauseReset = false;
+        this->isPaused = false;
+        this->once = false;
+        this->limbo = false;
+        this->prevTime = 0;
+        this->limbo = 0;
+        this->totalTime = 0;
+        this->display = 0;
+        this->totalPauseTime = 0;
+
     }
 
     void restartValues(){
@@ -46,12 +66,17 @@ public:
         this->started = false;
         this->winner = false;
         this->winnerWrote = false;
+        this->pauseReset = false;
+        this->isPaused = false;
         this->winnerTime = "";
         this->stopped = "";
-    }
-
-    void setName(const string &nameA) {
-        gameManager::name = nameA;
+        this->prevTime = 0;
+        this->limbo = 0;
+        this->totalTime = 0;
+        this->display = 0;
+        this->totalPauseTime = 0;
+        this->once = false;
+        this->limbo = false;
     }
 
 };
