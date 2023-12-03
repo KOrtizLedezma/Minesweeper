@@ -57,8 +57,6 @@ void checkScores(vector<string>& scores);
 string getScores(gameManager& manager);
 void flagAllMines(vector<vector<Cell>>& board);
 
-
-
 int main() {
 
     enum State { Welcome, Game};
@@ -80,9 +78,14 @@ int main() {
     vector<vector<bool>> states = initializeStatesBoard(rowCount, colCount);
 
     sf::RenderWindow window(sf::VideoMode(width, height), "Minesweeper");
-    window.setFramerateLimit(0);
+    //window.setFramerateLimit(0);
     sf::Font font;
-    font.loadFromFile("Font/font.ttf");
+    font.loadFromFile("Files/font.ttf");
+
+    vector<string> aux;
+    readAllScores(aux);
+    checkScores(aux);
+    writeLeaderboard(aux);
 
     sf::Text welcomeMessage("WELCOME TO MINESWEEPER!", font, 24);
     setText(welcomeMessage, (float(width)/2) , ((float(height)/2)-150));
@@ -116,7 +119,7 @@ int main() {
                         manager.name.pop_back();
                     }
                     sf::FloatRect textRect = inputName.getLocalBounds();
-                    inputName.setOrigin(textRect.left + textRect.width/2.0f,textRect.top + textRect.height/2.0f);
+                    inputName.setOrigin(textRect.left + textRect.width/2.0f,textRect.top);
                 }
                 else if(isalpha(event.text.unicode)){
                     if(manager.name.empty()){
@@ -130,7 +133,7 @@ int main() {
                         }
                     }
                     sf::FloatRect textRect = inputName.getLocalBounds();
-                    inputName.setOrigin(textRect.left + textRect.width/2.0f,textRect.top + textRect.height/2.0f);
+                    inputName.setOrigin(textRect.left + textRect.width/2.0f,textRect.top);
                 }
             }
         }
@@ -188,7 +191,7 @@ vector<vector<Cell>> createBoard(int& numCol, int& numRow, int& numMines){
     for(int i = 0 ;  i < numRow ; i++){
         for (int j = 0 ; j < numCol; j++){
             board[i][j].position = sf::Vector2f(float(j), float(i));
-            board[i][j].imagePath = "Images/tile_hidden.png";
+            board[i][j].imagePath = "Files/Images/tile_hidden.png";
             board[i][j].value = 0;
         }
     }
@@ -263,13 +266,13 @@ void drawFace(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<gene
     float y = 32 * (float(board.size()) + 0.5f);
     sf::Texture faceTexture;
     if(manager.gameOver){
-        faceTexture.loadFromFile("Images/face_lose.png");
+        faceTexture.loadFromFile("Files/Images/face_lose.png");
     }
     else if(manager.winner){
-        faceTexture.loadFromFile("Images/face_win.png");
+        faceTexture.loadFromFile("Files/Images/face_win.png");
     }
     else{
-        faceTexture.loadFromFile("Images/face_happy.png");
+        faceTexture.loadFromFile("Files/Images/face_happy.png");
     }
 
 
@@ -300,7 +303,7 @@ void drawDebugButton(sf::RenderWindow& window, vector<genericButton>& buttons, v
     for(int i = 0 ; i < buttons.size() ; i++){
         if(buttons[i].type == "debug"){
             sf::Texture mineTexture;
-            mineTexture.loadFromFile("Images/debug.png");
+            mineTexture.loadFromFile("Files/Images/debug.png");
 
             sf::RectangleShape mineRectangle(sf::Vector2f(64,64));
             mineRectangle.setPosition(x, y);
@@ -352,18 +355,18 @@ void drawPauseButton(sf::RenderWindow& window, vector<genericButton>& buttons, v
             if(sf::Mouse::isButtonPressed(sf::Mouse::Left) && !manager.gameOver && !manager.winner){
                 sf::Vector2i clickPosition = sf::Mouse::getPosition(window);
                 if(pauseRectangle.getGlobalBounds().contains(sf::Vector2f(clickPosition))){
-                    if(buttons[i].imagePath == "Images/play.png"){
+                    if(buttons[i].imagePath == "Files/Images/play.png"){
                         hideAllTiles(board);
                         returnValueBoard(board, states);
-                        buttons[i].imagePath = "Images/pause.png";
+                        buttons[i].imagePath = "Files/Images/pause.png";
                         togglePause(manager);
                         manager.once = false;
                         manager.limbo = false;
                     }
-                    else if(buttons[i].imagePath == "Images/pause.png"){
+                    else if(buttons[i].imagePath == "Files/Images/pause.png"){
                         saveStateOfTiles(board, states);
                         revealAllTiles(board);
-                        buttons[i].imagePath = "Images/play.png";
+                        buttons[i].imagePath = "Files/Images/play.png";
                         togglePause(manager);
                     }
                 }
@@ -454,7 +457,7 @@ void drawPlayZone(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<
                 }
             }
             if(board[i][j].revealed && !manager.paused && !manager.leaderboardClicked){
-                board[i][j].imagePath = "Images/tile_revealed.png";
+                board[i][j].imagePath = "Files/Images/tile_revealed.png";
                 drawNumber(window, board[i][j]);
             }
             if(board[i][j].flagged && !board[i][j].revealed && !manager.paused && !manager.leaderboardClicked){
@@ -500,16 +503,16 @@ void drawPlayZone(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<
 // Choose the correct image path
 string chooseImage(int value){
     string path;
-    if(value == 0) path = "Images/tile_revealed.png";
-    else if(value == 1) path = "Images/number_1.png";
-    else if(value == 2) path = "Images/number_2.png";
-    else if(value == 3) path = "Images/number_3.png";
-    else if(value == 4) path = "Images/number_4.png";
-    else if(value == 5) path = "Images/number_5.png";
-    else if(value == 6) path = "Images/number_6.png";
-    else if(value == 7) path = "Images/number_7.png";
-    else if(value == 8) path = "Images/number_8.png";
-    else path = "Images/mine.png";
+    if(value == 0) path = "Files/Images/tile_revealed.png";
+    else if(value == 1) path = "Files/Images/number_1.png";
+    else if(value == 2) path = "Files/Images/number_2.png";
+    else if(value == 3) path = "Files/Images/number_3.png";
+    else if(value == 4) path = "Files/Images/number_4.png";
+    else if(value == 5) path = "Files/Images/number_5.png";
+    else if(value == 6) path = "Files/Images/number_6.png";
+    else if(value == 7) path = "Files/Images/number_7.png";
+    else if(value == 8) path = "Files/Images/number_8.png";
+    else path = "Files/Images/mine.png";
 
     return path;
 }
@@ -520,22 +523,22 @@ vector<genericButton> createButtonsVector(){
     vector<genericButton> buttons;
 
     genericButton pauseButton;
-    pauseButton.imagePath =  "Images/pause.png";
+    pauseButton.imagePath =  "Files/Images/pause.png";
     pauseButton.type = "pause";
     buttons.push_back(pauseButton);
 
     genericButton faceButton;
-    faceButton.imagePath =  "Images/face_happy.png";
+    faceButton.imagePath =  "Files/Images/face_happy.png";
     faceButton.type = "face";
     buttons.push_back(faceButton);
 
     genericButton debugButton;
-    debugButton.imagePath = "Images/debug.png";
+    debugButton.imagePath = "Files/Images/debug.png";
     debugButton.type = "debug";
     buttons.push_back(debugButton);
 
     genericButton leaderboardButton;
-    leaderboardButton.imagePath = "Images/leaderboard.png";
+    leaderboardButton.imagePath = "Files/Images/leaderboard.png";
     leaderboardButton.type = "leaderboard";
     buttons.push_back(leaderboardButton);
 
@@ -548,7 +551,7 @@ void revealAllMines(vector<vector<Cell>>& board){
         for(int j = 0 ; j < board[i].size() ; j++){
             if(board[i][j].itsMine){
                 board[i][j].revealed = true;
-                board[i][j].imagePath = "Images/mine.png";
+                board[i][j].imagePath = "Files/Images/mine.png";
             }
         }
     }
@@ -560,21 +563,21 @@ void drawCounter(sf::RenderWindow& window, const vector<vector<Cell>>& board, co
     int sprite2Pos = chooseRightValue(value[1]);
     int sprite3Pos = chooseRightValue(value[2]);
     sf::Texture tileTexture1;
-    tileTexture1.loadFromFile("Images/digits.png");
+    tileTexture1.loadFromFile("Files/Images/digits.png");
     sf::Sprite tileSprite1;
     tileSprite1.setTexture(tileTexture1);
     tileSprite1.setTextureRect(sf::IntRect(21*sprite1Pos, 0, 21, 32));
     tileSprite1.setPosition(33, 32 * (board.size() + 0.5) + 16);
     window.draw(tileSprite1);
     sf::Texture tileTexture2;
-    tileTexture2.loadFromFile("Images/digits.png");
+    tileTexture2.loadFromFile("Files/Images/digits.png");
     sf::Sprite tileSprite2;
     tileSprite2.setTexture(tileTexture2);
     tileSprite2.setTextureRect(sf::IntRect(21*sprite2Pos, 0, 21, 32));
     tileSprite2.setPosition(54, 32 * (board.size() + 0.5) + 16);
     window.draw(tileSprite2);
     sf::Texture tileTexture3;
-    tileTexture3.loadFromFile("Images/digits.png");
+    tileTexture3.loadFromFile("Files/Images/digits.png");
     sf::Sprite tileSprite3;
     tileSprite3.setTexture(tileTexture3);
     tileSprite3.setTextureRect(sf::IntRect(21*sprite3Pos, 0, 21, 32));
@@ -601,7 +604,7 @@ void changeFlagValue(Cell& cell){
 // Draws the flag on the board
 void drawFlag(sf::RenderWindow& window, Cell& cell){
     sf::Texture flagTexture;
-    flagTexture.loadFromFile("Images/flag.png");
+    flagTexture.loadFromFile("Files/Images/flag.png");
     sf::Sprite flagSprite;
     flagSprite.setTexture(flagTexture);
     flagSprite.setTextureRect(sf::IntRect(0, 0, 32, 32));
@@ -612,7 +615,7 @@ void drawFlag(sf::RenderWindow& window, Cell& cell){
 // Draws the mines on the board
 void drawMine(sf::RenderWindow& window, Cell& cell){
     sf::Texture mineTexture;
-    mineTexture.loadFromFile("Images/mine.png");
+    mineTexture.loadFromFile("Files/Images/mine.png");
     sf::Sprite mineSprite;
     mineSprite.setTexture(mineTexture);
     mineSprite.setTextureRect(sf::IntRect(0, 0, 32, 32));
@@ -660,28 +663,28 @@ void drawClock(sf::RenderWindow& window, const vector<vector<Cell>>& board, cons
     int sprite3Pos = chooseRightValue(value[2]);
     int sprite4Pos = chooseRightValue(value[3]);
     sf::Texture tileTexture1;
-    tileTexture1.loadFromFile("Images/digits.png");
+    tileTexture1.loadFromFile("Files/Images/digits.png");
     sf::Sprite tileSprite1;
     tileSprite1.setTexture(tileTexture1);
     tileSprite1.setTextureRect(sf::IntRect(21*sprite1Pos, 0, 21, 32));
     tileSprite1.setPosition((board[1].size() * 32) - 97, 32 * (board.size() + 0.5) + 16);
     window.draw(tileSprite1);
     sf::Texture tileTexture2;
-    tileTexture2.loadFromFile("Images/digits.png");
+    tileTexture2.loadFromFile("Files/Images/digits.png");
     sf::Sprite tileSprite2;
     tileSprite2.setTexture(tileTexture2);
     tileSprite2.setTextureRect(sf::IntRect(21*sprite2Pos, 0, 21, 32));
     tileSprite2.setPosition((board[1].size() * 32) - 76, 32 * (board.size() + 0.5) + 16);
     window.draw(tileSprite2);
     sf::Texture tileTexture3;
-    tileTexture3.loadFromFile("Images/digits.png");
+    tileTexture3.loadFromFile("Files/Images/digits.png");
     sf::Sprite tileSprite3;
     tileSprite3.setTexture(tileTexture3);
     tileSprite3.setTextureRect(sf::IntRect(21*sprite3Pos, 0, 21, 32));
     tileSprite3.setPosition((board[1].size() * 32) - 54, 32 * (board.size() + 0.5) + 16);
     window.draw(tileSprite3);
     sf::Texture tileTexture4;
-    tileTexture4.loadFromFile("Images/digits.png");
+    tileTexture4.loadFromFile("Files/Images/digits.png");
     sf::Sprite tileSprite4;
     tileSprite4.setTexture(tileTexture4);
     tileSprite4.setTextureRect(sf::IntRect(21*sprite4Pos, 0, 21, 32));
@@ -714,17 +717,17 @@ void makeTime(sf::RenderWindow& window, vector<vector<Cell>>& board, gameManager
     sf::Time elapsedTotal;
     sf::Time pauseTotal;
     //Resets the clock
-    if (!manager.started && !manager.paused) {
+    if (!manager.started && !manager.paused && !manager.leaderboardOpen) {
         manager.clockNew.restart();  // Start the clock
         manager.started = true;
     }
     //Resets the pause clock
-    if(!manager.once && manager.paused){
+    if(!manager.once && (manager.paused || manager.leaderboardOpen)){
         manager.pausedClock.restart(); // resets clock to avoid counting from the first pause
         manager.once = true;
     }
 
-    if(!manager.paused){
+    if(!manager.paused || !manager.leaderboardOpen){
         if(!manager.limbo){
             manager.totalPauseTime += manager.prevTime;
             manager.limbo = true;
@@ -748,6 +751,8 @@ void makeTime(sf::RenderWindow& window, vector<vector<Cell>>& board, gameManager
 
     if(manager.gameOver){
         manager.clockNew.restart();
+        manager.pausedClock.restart();
+        manager.display = 0;
     }
 }
 
@@ -799,7 +804,7 @@ void saveStateOfTiles(vector<vector<Cell>>& board, vector<vector<bool>>& states)
 void revealAllTiles(vector<vector<Cell>>& board){
     for(int i = 0 ; i < board.size() ; i++){
         for(int j = 0 ; j < board[1].size() ; j++){
-            board[i][j].imagePath = "Images/tile_revealed.png";
+            board[i][j].imagePath = "Files/Images/tile_revealed.png";
             board[i][j].revealed = true;
         }
     }
@@ -809,7 +814,7 @@ void hideAllTiles(vector<vector<Cell>>& board){
     for(int i = 0 ; i < board.size() ; i++){
         for(int j = 0 ; j < board[1].size() ; j++){
             board[i][j].revealed = false;
-            board[i][j].imagePath = "Images/tile_hidden.png";
+            board[i][j].imagePath = "Files/Images/tile_hidden.png";
         }
     }
 }
@@ -838,7 +843,7 @@ void drawLeaderboardStuff(sf::RenderWindow& leaderboardWindow, vector<vector<Cel
     int height = (board.size() * 16) + 50;
 
     sf::Font font;
-    font.loadFromFile("Font/font.ttf");
+    font.loadFromFile("Files/font.ttf");
 
     sf::Text tittle("LEADERBOARD", font, 20);
     setText(tittle, (float(width)/2) , ((float(height)/2)-120));
@@ -883,6 +888,8 @@ void drawLeaderboard(vector<vector<Cell>>& board, vector<vector<bool>>& states, 
                 returnValueBoard(board, states);
                 manager.leaderboardOpen = false;
                 leaderboardWindow.close();
+                manager.limbo = false;
+                manager.once = false;
             }
         }
         leaderboardWindow.clear(sf::Color::Blue);
