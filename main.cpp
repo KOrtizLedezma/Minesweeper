@@ -490,6 +490,9 @@ void drawPlayZone(sf::RenderWindow& window, vector<vector<Cell>>& board, vector<
             writeLeaderboard(scores);
             flagAllMines(board);
             buttons[2].clicked = false;
+            thread leaderboardThread(drawLeaderboard, ref(board), ref(states), ref(manager));
+            leaderboardThread.detach();
+            manager.leaderboardOpen = true;
         }
     }
 
@@ -884,8 +887,11 @@ void drawLeaderboard(vector<vector<Cell>>& board, vector<vector<bool>>& states, 
         while(leaderboardWindow.pollEvent(event)) {
             if(event.type == sf::Event::Closed) {
                 manager.leaderboardClicked = false;
-                hideAllTiles(board);
-                returnValueBoard(board, states);
+                if(!manager.winner){
+                    hideAllTiles(board);
+                    returnValueBoard(board, states);
+                }
+
                 manager.leaderboardOpen = false;
                 leaderboardWindow.close();
                 manager.limbo = false;
